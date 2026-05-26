@@ -301,50 +301,6 @@ PRED is called with KEY VALUE."
 
 ;;; Chat
 
-(define-widget 'pi-label 'item
-  "A generic label widget for displaying read-only text.
-
-Properties:
-  :face       - face for the value (symbol or function taking widget and value)
-  :tag-face   - face for the tag
-  :tag        - optional prefix label
-  :offset     - spacing between tag and value (default 1)
-  :padding    - padding character (default space)
-  :truncate   - max length for value (nil for no truncation)
-  :format     - format string (default \"%T%v\")
-
-The %T escape in format inserts the tag with offset.
-
-Example:
-  (widget-create \\='label :tag \"Name:\" :value \"Boris\")
-  (widget-create \\='label :truncate 10 :value \"A very long string\")"
-  :face 'default
-  :tag-face 'default
-  :offset 1
-  :padding ?\s
-  ;; note - only value is truncated as tags are generally static hence there is no need to truncate them
-  :truncate nil
-  :format "%T%v"
-  :format-handler
-  (lambda (widget escape)
-    ;; we support custom tag prefix (optional + offsets)
-    (cond ((eq escape ?T)
-           (when-let ((tag (widget-get widget :tag)))
-             (let ((offset (widget-get widget :offset)))
-               (insert (propertize tag 'face (widget-get widget :tag-face))
-                       (make-string offset (widget-get widget :padding))))))))
-  :format-value (lambda (_widget value) value)
-  :value-create
-  (lambda (widget)
-    (let* ((s (widget-apply widget :format-value (widget-get widget :value)))
-           (truncate (widget-get widget :truncate))
-           (face (widget-get widget :face)))
-      ;; Only call face as function if it's not a known face symbol
-      ;; (some face names like 'error are also function names)
-      (when (and (functionp face) (not (facep face)))
-        (setq face (widget-apply widget :face (widget-get widget :value))))
-      (insert (propertize (if truncate (truncate-string-to-width s truncate) s) 'face face)))))
-
 (pi-def-permanent-buffer-local pi-prompt-widget nil)
 (pi-def-permanent-buffer-local pi-message-widget nil)
 (pi-def-permanent-buffer-local pi-thinking-widget nil)
@@ -532,12 +488,13 @@ For read/write/edit, the path is rendered as a file-link widget."
      "prompt"
      (list :message prompt)
      (lambda (resp)
-       (when (equal (plist-get resp :success) 'json-false)
+       (if (equal (plist-get resp :success) 'json-false)
          (pi-widget-save-excursion
            (widget-insert
             (propertize
              (format "%s\n\n" (plist-get resp :error))
-             'face 'pi-widget-error-face))))))))
+             'face 'pi-widget-error-face)))
+         (widget-value-set pi-prompt-widget ""))))))
 
 (defun pi-get-session-stats ()
   (interactive)
