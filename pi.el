@@ -621,6 +621,36 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 
            (widget-insert "\n\n")))))))
 
+(defun pi-select-model ()
+  (interactive)
+  (pi-with-chat-buffer
+    (pi-send-command
+     "get_available_models"
+     '()
+     (lambda (resp)
+       (when (plist-get resp :success)
+         (let* ((models (plist-get (plist-get resp :data) :models))
+                (items
+                 (mapcar
+                  (lambda (m)
+                    (cons (format "[%s] %s" (plist-get m :provider) (plist-get m :id))
+                          m))
+                  models)))
+           (if (null items)
+               (message "No models available.")
+             (let* ((selected (completing-read "Select model: " items nil t))
+                    (model (alist-get selected items nil nil #'equal))
+                    (provider (plist-get model :provider))
+                    (model-id (plist-get model :id)))
+               (pi-send-command
+                "set_model"
+                (list :provider provider :modelId model-id)
+                (lambda (resp)
+                  (when (plist-get resp :success)
+                    (pi-update-header-line)
+                    (pi-widget-save-excursion
+                      (widget-insert (format "Switched to model: [%s] %s\n\n" provider model-id))))))))))))))
+
 (provide 'pi)
 
 ;;; pi.el ends here
