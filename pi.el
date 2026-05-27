@@ -416,10 +416,23 @@ PRED is called with KEY VALUE."
 
 
 (defun pi-format-tool-args (tool-name args)
-  "Format ARGS for display based on TOOL-NAME.
-For read/write/edit, the path is rendered as a file-link widget."
   (pcase tool-name
-    ((or "read" "write")
+    ("read"
+     (when-let ((path (plist-get args :path)))
+       (let* ((offset (plist-get args :offset))
+              (limit (plist-get args :limit))
+              (start-line (or offset 1))
+              (suffix (cond
+                       ((and (null offset) (null limit)) "")
+                       ((null limit) (format ":%d" start-line))
+                       (t (let ((end-line (+ start-line limit -1)))
+                            (format ":%d-%d" start-line end-line))))))
+         (widget-create 'file-link
+                        :button-prefix ""
+                        :button-suffix suffix
+                        (expand-file-name path (pi-project-root)))
+         (widget-insert "\n"))))
+    ("write"
      (when-let ((path (plist-get args :path)))
        (widget-create 'file-link
                       :button-prefix ""
@@ -438,7 +451,6 @@ For read/write/edit, the path is rendered as a file-link widget."
        (widget-insert (format "%s \n" command))))
     (_
      (widget-insert (format "%S\n" args)))))
-
 
 (defun pi-handle-tool-execution-start (event)
   (let* ((tool-name (plist-get event :toolName))
