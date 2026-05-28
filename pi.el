@@ -32,6 +32,7 @@
 (require 'widget)
 (require 'wid-edit)
 (require 'markdown-mode)
+(require 'pi-section)
 
 (defgroup pi nil
   "Emacs UI for Pi."
@@ -43,7 +44,7 @@
   "Face used for chat message role labels."
   :group 'pi)
 
-(defface pi-widget-error-face
+(defface pi-error-face
   '((t :inherit error))
   "Face used for Pi widget error messages."
   :group 'pi)
@@ -110,8 +111,8 @@
   (mapconcat 'identity list ""))
 
 (defun pi-insert-error (text)
-  "Insert TEXT with `pi-widget-error-face'."
-  (widget-insert (propertize text 'face 'pi-widget-error-face)))
+  "Insert TEXT with `pi-error-face'."
+  (insert (propertize text 'face 'pi-error-face)))
 
 (defun pi-seconds-elapsed-since (time)
   (time-to-seconds (time-subtract (current-time) time)))
@@ -139,7 +140,8 @@ PRED is called with KEY VALUE."
            (progn ,@body)
          (when-let (err (plist-get ,resp-sym :error))
            (pi-widget-save-excursion
-             (pi-insert-error (format "%s\n\n" err)))
+             (pi-create-section "error" 'error pi-root-section
+              (pi-insert-error (format "%s\n\n" err))))
            nil)))))
 
 (defmacro pi-on-response-success-callback (response &rest body)
@@ -190,27 +192,20 @@ PRED is called with KEY VALUE."
     (set-buffer-modified-p nil)
     (buffer-string)))
 
-(defun pi-widget-replace-with-markdown (widget text)
-  (let ((inhibit-read-only t))
-    (save-excursion
-      (goto-char (widget-get widget :from))
-      (widget-delete widget)
-      (widget-insert (pi-render-markdown text))
-      (widget-insert "\n\n"))))
-
 ;;; State management
 
-(pi-def-permanent-buffer-local pi-project-root nil)
 
 (defvar pi-agents (make-hash-table :test 'equal))
 (defvar pi-chats (make-hash-table :test 'equal))
 (defvar pi-response-callbacks (make-hash-table :test 'equal))
 
+(pi-def-permanent-buffer-local pi-project-root nil)
 (pi-def-permanent-buffer-local pi-prompt-widget nil)
-(pi-def-permanent-buffer-local pi-message-widget nil)
-(pi-def-permanent-buffer-local pi-thinking-widget nil)
+(pi-def-permanent-buffer-local pi-text-section nil)
+(pi-def-permanent-buffer-local pi-thinking-section nil)
 (pi-def-permanent-buffer-local pi-header-line-state nil)
 (pi-def-permanent-buffer-local pi-current-tool-read-filename nil)
+(pi-def-permanent-buffer-local pi-current-tool-section nil)
 
 
 (defvar pi-event-listeners (make-hash-table :test 'equal))
@@ -240,10 +235,10 @@ PRED is called with KEY VALUE."
 (defmacro pi-widget-save-excursion (&rest body)
   "Insert content before PROMPT-WIDGET and restore focus afterward."
   (declare (indent 0) (debug t))
-  `(save-excursion
-     (goto-char (widget-get pi-prompt-widget :from))
-     ,@body
-     (widget-setup)))
+  `(let ((inhibit-read-only t))
+     (save-excursion
+       (goto-char (widget-get pi-prompt-widget :from))
+       ,@body)))
 
 (defmacro pi-with-chat-buffer (&rest body)
   "Execute the body in the current chat buffer"
@@ -415,37 +410,41 @@ PRED is called with KEY VALUE."
          (thinking-text (pi-content-thinking message))
          (text (pi-content-text message)))
     (when (member role '("assistant" "user"))
-     (unless (string-empty-p thinking-text)
-       (pi-widget-save-excursion
-         (unless pi-thinking-widget
-           (widget-insert
-            (propertize
-             (format "%s> " role)
-             'face 'pi-chat-role-face))
-           (setq pi-thinking-widget (widget-create 'item
-                                                   :format "%[%v%]\n\n"
-                                                   :button-face 'pi-thinking-face
-                                                   "")))
-         (widget-value-set pi-thinking-widget thinking-text)))
+      (unless (string-empty-p thinking-text)
+        (pi-widget-save-excursion
+          (if pi-thinking-section
+              (pi-replace-section pi-thinking-section
+                (insert (propertize (format "%s> " role) 'face 'pi-chat-role-face))
+                (insert (propertize thinking-text 'face 'pi-thinking-face))
+                (insert "\n\n"))
+            (setq pi-thinking-section (pi-new-section "thinking" 'thinking pi-root-section))
+            (pi-insert-section pi-thinking-section
+              (insert (propertize (format "%s> " role) 'face 'pi-chat-role-face))
+              (insert (propertize thinking-text 'face 'pi-thinking-face))
+              (insert "\n\n")))))
 
-     (unless (string-empty-p text)
-       (pi-widget-save-excursion
-         (unless pi-message-widget
-           (widget-insert
-            (propertize
-             (format "%s> " role)
-             'face 'pi-chat-role-face))
-           (setq pi-message-widget (widget-create 'item
-                                                  :format "%v\n\n"
-                                                  "")))
-         (widget-value-set pi-message-widget text))))
+      (unless (string-empty-p text)
+        (pi-widget-save-excursion
+          (if pi-text-section
+              (pi-replace-section pi-text-section
+                (insert (propertize (format "%s> " role) 'face 'pi-chat-role-face))
+                (insert text)
+                (insert "\n\n"))
+            (setq pi-text-section (pi-new-section "text" 'text pi-root-section))
+            (pi-insert-section pi-text-section
+              (insert (propertize (format "%s> " role) 'face 'pi-chat-role-face))
+              (insert text)
+              (insert "\n\n"))))))
     (when (equal type "message_end")
-      (pi-widget-save-excursion
-        (when (and (equal role "assistant") (not (string-empty-p text)))
-          (pi-widget-replace-with-markdown pi-message-widget text)))
+      (when (and (equal role "assistant") (not (string-empty-p text)))
+        (pi-widget-save-excursion
+         (pi-replace-section pi-text-section
+           (insert (propertize (format "%s> " role) 'face 'pi-chat-role-face))
+           (insert (pi-render-markdown text))
+           (insert "\n\n"))))
       ;; Cleanup tracking state
-      (setq pi-thinking-widget nil
-            pi-message-widget nil))))
+      (setq pi-text-section nil
+            pi-thinking-section nil))))
 
 
 (defun pi-format-tool-args (tool-name args)
@@ -464,7 +463,7 @@ PRED is called with KEY VALUE."
                         :button-prefix ""
                         :button-suffix suffix
                         (expand-file-name path (pi-project-root)))
-         (widget-insert "\n"))))
+         (insert "\n"))))
     ("write"
      (when-let ((path (plist-get args :path))
                 (content (plist-get args :content)))
@@ -473,21 +472,21 @@ PRED is called with KEY VALUE."
                       :button-suffix ""
                       (expand-file-name path (pi-project-root)))
        (when (not (string-empty-p content))
-         (widget-insert "\n")
-         (widget-insert (pi-render-content path content)))
-       (widget-insert "\n")))
+         (insert "\n")
+         (insert (pi-render-content path content)))
+       (insert "\n")))
     ("edit"
      (when-let ((path (plist-get args :path)))
        (widget-create 'file-link
                       :button-prefix ""
                       :button-suffix ""
                       (expand-file-name path (pi-project-root)))
-       (widget-insert "\n")))
+       (insert "\n")))
     ("bash"
      (when-let ((command (plist-get args :command)))
-       (widget-insert (format "%s \n" command))))
+       (insert (format "%s \n" command))))
     (_
-     (widget-insert (format "%S\n" args)))))
+     (insert (format "%S\n" args)))))
 
 (defun pi-handle-tool-execution-start (event)
   (let* ((tool-name (plist-get event :toolName))
@@ -495,39 +494,47 @@ PRED is called with KEY VALUE."
     (when (string= tool-name "read")
       (setq pi-current-tool-read-filename (plist-get args :path)))
     (pi-widget-save-excursion
-      (widget-insert
-       (propertize (format "%s " tool-name) 'face 'pi-tool-name-face))
-      (pi-format-tool-args tool-name args))))
+      (setq pi-current-tool-section (pi-new-section tool-name 'tool pi-root-section))
+      (pi-insert-section pi-current-tool-section
+        (insert
+         (propertize (format "%s " tool-name) 'face 'pi-tool-name-face))
+        (pi-format-tool-args tool-name args)))))
 
 (defun pi-handle-tool-execution-end (event)
   (let* ((result (plist-get event :result))
          (result-text (pi-content-text result))
          (is-error (plist-get event :isError))
          (tool-name (plist-get event :toolName)))
-    (pi-widget-save-excursion
-      (cond
-       ((eq is-error t)
-        (when (not (string-empty-p result-text))
-          (pi-insert-error (format "%s\n" result-text))))
-       ((string= tool-name "read")
-        (when (not (string-empty-p result-text))
-          (let ((truncated-line nil))
-            (when (string-match "\n\\(\\[.*more lines.*continue.\\]\\)$" result-text)
-              (setq truncated-line (match-string 1 result-text)
-                    result-text (replace-match "" nil nil result-text)))
-            (widget-insert (pi-render-content pi-current-tool-read-filename result-text))
-            (widget-insert (format "%s\n" (or truncated-line ""))))))
-       ((string= tool-name "edit")
-        (when-let ((details (plist-get result :details))
-                   (diff (plist-get details :diff)))
-          (widget-insert (pi-render-diff diff))
-          (widget-insert "\n"))
-        (when (not (string-empty-p result-text))
-          (widget-insert (format "%s\n" result-text))))
-       (t
-        (when (not (string-empty-p result-text))
-          (widget-insert (format "%s\n" result-text))))))
-    (setq pi-current-tool-read-filename nil)))
+    (when pi-current-tool-section
+      (pi-widget-save-excursion
+       (pi-replace-section pi-current-tool-section
+         (insert
+          (propertize (format "%s " tool-name) 'face 'pi-tool-name-face))
+         (pi-format-tool-args tool-name (plist-get event :args))
+         (cond
+          ((eq is-error t)
+           (when (not (string-empty-p result-text))
+             (pi-insert-error (format "%s\n" result-text))))
+          ((string= tool-name "read")
+           (when (not (string-empty-p result-text))
+             (let ((truncated-line nil))
+               (when (string-match "\n\\(\\[.*more lines.*continue.\\]\\)$" result-text)
+                 (setq truncated-line (match-string 1 result-text)
+                       result-text (replace-match "" nil nil result-text)))
+               (insert (pi-render-content pi-current-tool-read-filename result-text))
+               (insert (format "%s\n" (or truncated-line ""))))))
+          ((string= tool-name "edit")
+           (when-let ((details (plist-get result :details))
+                      (diff (plist-get details :diff)))
+             (insert (pi-render-diff diff))
+             (insert "\n"))
+           (when (not (string-empty-p result-text))
+             (insert (format "%s\n" result-text))))
+          (t
+           (when (not (string-empty-p result-text))
+             (insert (format "%s\n" result-text))))))))
+    (setq pi-current-tool-read-filename nil
+          pi-current-tool-section nil)))
 
 (defun pi-handle-auto-retry-start (event)
   (let ((attempt (plist-get event :attempt))
@@ -536,18 +543,20 @@ PRED is called with KEY VALUE."
         (error-message (plist-get event :errorMessage)))
     (when (and error-message (not (string-empty-p error-message)))
       (pi-widget-save-excursion
-        (pi-insert-error (format "Error: %s\n\n" error-message))
-        (widget-insert
-         (propertize (format "Retrying %d/%d (waiting %ds)…\n\n" attempt max-attempts (/ delay-ms 1000))
-                     'face 'pi-thinking-face))))))
+        (pi-create-section "error" 'error pi-root-section
+         (pi-insert-error (format "Error: %s\n\n" error-message))
+         (insert
+          (propertize (format "Retrying %d/%d (waiting %ds)…\n\n" attempt max-attempts (/ delay-ms 1000))
+                      'face 'pi-thinking-face)))))))
 
 (defun pi-handle-auto-retry-end (event)
   (let ((attempt (plist-get event :attempt))
         (final-error (plist-get event :finalError)))
     (unless (pi-response-success-p event)
       (pi-widget-save-excursion
-        (pi-insert-error
-         (format "Error: Retry failed after %d attempts: %s\n\n" attempt final-error))))))
+        (pi-create-section "error" 'error pi-root-section
+         (pi-insert-error
+          (format "Error: Retry failed after %d attempts: %s\n\n" attempt final-error)))))))
 
 (defun pi-handle-header-line-update (_event)
   (pi-update-header-line))
@@ -651,15 +660,16 @@ PRED is called with KEY VALUE."
      "abort" '()
      (pi-on-response-success-callback resp
        (pi-widget-save-excursion
-         (pi-insert-error "Aborted.\n\n")))))
+         (pi-create-section "error" 'error pi-root-section
+           (pi-insert-error "Aborted.\n\n"))))))
   (keyboard-quit))
 
 (defun pi-insert-stats-section (header plist fields)
   "Insert a stats section with HEADER (bold), extracting integers from PLIST.
 FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
-  (widget-insert (propertize (concat header "\n") 'face 'bold))
+  (insert (propertize (concat header "\n") 'face 'bold))
   (pcase-dolist (`(,label . ,key) fields)
-    (widget-insert (format " %s: %d\n" label (plist-get plist key)))))
+    (insert (format " %s: %d\n" label (plist-get plist key)))))
 
 (defun pi-session-stats ()
   (interactive)
@@ -671,48 +681,49 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
               (tokens (plist-get data :tokens))
               (cost (plist-get data :cost)))
          (pi-widget-save-excursion
-           (widget-insert
-            (propertize "Session Info\n" 'face 'bold))
+          (pi-create-section "session" 'session pi-root-section
+            (insert
+             (propertize "Session Info\n" 'face 'bold))
 
-           (widget-insert " File: ")
-           (widget-create 'file-link
-                          :button-prefix ""
-                          :button-suffix ""
-                          (plist-get data :sessionFile))
-           (widget-insert "\n")
+            (insert " File: ")
+            (widget-create 'file-link
+                           :button-prefix ""
+                           :button-suffix ""
+                           (plist-get data :sessionFile))
+            (insert "\n")
 
-           (widget-insert
-            (format " ID: %s\n\n"
-                    (plist-get data :sessionId)))
+            (insert
+             (format " ID: %s\n\n"
+                     (plist-get data :sessionId)))
 
-           (pi-insert-stats-section
-            "Messages"
-            data
-            '(("User" . :userMessages)
-              ("Assistant" . :assistantMessages)
-              ("Tool Calls" . :toolCalls)
-              ("Tool Results" . :toolResults)
-              ("Total" . :totalMessages)))
+            (pi-insert-stats-section
+             "Messages"
+             data
+             '(("User" . :userMessages)
+               ("Assistant" . :assistantMessages)
+               ("Tool Calls" . :toolCalls)
+               ("Tool Results" . :toolResults)
+               ("Total" . :totalMessages)))
 
-           (widget-insert "\n")
+            (insert "\n")
 
-           (pi-insert-stats-section
-            "Tokens"
-            tokens
-            '(("Input" . :input)
-              ("Output" . :output)
-              ("Cache Read" . :cacheRead)
-              ("Total" . :total)))
+            (pi-insert-stats-section
+             "Tokens"
+             tokens
+             '(("Input" . :input)
+               ("Output" . :output)
+               ("Cache Read" . :cacheRead)
+               ("Total" . :total)))
 
-           (widget-insert "\n")
+            (insert "\n")
 
-           (widget-insert
-            (propertize "Cost\n" 'face 'bold))
+            (insert
+             (propertize "Cost\n" 'face 'bold))
 
-           (widget-insert
-            (format " Total: %.4f\n" cost))
+            (insert
+             (format " Total: %.4f\n" cost))
 
-           (widget-insert "\n\n")))))))
+            (insert "\n\n"))))))))
 
 (defun pi-select-model ()
   (interactive)
@@ -738,7 +749,8 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
               (pi-on-response-success-callback resp
                 (pi-update-header-line)
                 (pi-widget-save-excursion
-                  (widget-insert (format "Switched to model: [%s] %s\n\n" provider model-id))))))))))))
+                  (pi-create-section "model" 'model pi-root-section
+                   (insert (format "Switched to model: [%s] %s\n\n" provider model-id)))))))))))))
 
 
 
@@ -747,11 +759,20 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 (defvar-keymap pi-chat-mode-map
   :doc "Keymap for `pi-chat-mode'."
   :parent (make-composed-keymap widget-keymap special-mode-map)
-  "C-g" #'pi-abort)
+  "C-g" #'pi-abort
+  "TAB" #'pi-toggle-section
+  "C-i" #'pi-toggle-section
+  "n" #'pi-goto-next-section
+  "M-n" #'pi-goto-next-section
+  "p" #'pi-goto-previous-section
+  "M-p" #'pi-goto-previous-section
+  "i" #'pi-focus-prompt)
 
 (defvar pi-chat-widget-field-keymap
   (let ((map (make-composed-keymap nil widget-field-keymap)))
     (keymap-set map "C-g" #'pi-abort)
+    (keymap-set map "M-p" #'pi-goto-previous-section)
+    (keymap-set map "M-n" #'pi-goto-next-section)
     map))
 
 (define-derived-mode pi-chat-mode nil "pi-chat"
@@ -759,6 +780,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 
 \\{pi-chat-mode-map}"
   (setq header-line-format '(:eval (pi-format-header)))
+  (setq pi-root-section (pi-create-root-section))
   (setq pi-prompt-widget
         (widget-create 'editable-field
                        :keymap pi-chat-widget-field-keymap

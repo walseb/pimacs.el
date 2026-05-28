@@ -3,6 +3,8 @@
 (require 'cl-lib)
 
 (defvar pi-section-hidden-default nil)
+(defvar-local pi-root-section nil)
+
 
 ;; A buffer in pi-mode is organized into hierarchical sections.
 ;; These sections are used for navigation and for hiding parts of the
@@ -51,6 +53,15 @@
        (setf (pi-section-beginning ,s) (pi-advance-pointer-maker (pi-section-beginning ,s)))
        (pi-update-section-end ,s (point-marker))
        (pi-propertize-section ,s)
+       ,s)))
+
+(defmacro pi-create-section (title type parent &rest body)
+  (declare (indent 3)
+           (debug (symbolp body)))
+  (let ((s (make-symbol "*section*")))
+    `(let* ((,s (pi-new-section ,title ,type ,parent)))
+       (pi-insert-section ,s
+         ,@body)
        ,s)))
 
 (defmacro pi-append-section (section &rest body)
@@ -148,12 +159,13 @@
   "Go to the next pi section."
   (interactive)
   (let* ((section (pi-current-section))
-         (next (or (and (not (pi-section-hidden section))
-                        (pi-section-children section)
-                        (pi-find-section-after (point)
-                                                  (pi-section-children
-                                                   section)))
-                   (pi-next-section section))))
+         (next (and section
+                    (or (and (not (pi-section-hidden section))
+                             (pi-section-children section)
+                             (pi-find-section-after (point)
+                                                    (pi-section-children
+                                                     section)))
+                        (pi-next-section section)))))
     (cond
      (next
       (goto-char (pi-section-beginning next)))
@@ -173,22 +185,27 @@
                 (t
                  parent))))))
 
-
 (defun pi-goto-previous-section ()
   "Goto the previous pi section."
   (interactive)
   (let ((section (pi-current-section)))
-    (cond ((= (point) (pi-section-beginning section))
-           (let ((prev (pi-prev-section (pi-current-section))))
-             (if prev
-                 (goto-char (pi-section-beginning prev))
-               (message "No previous section"))))
-          (t
-           (let ((prev (pi-find-section-before (point)
-                                                  (pi-section-children
-                                                   section))))
-             (goto-char (pi-section-beginning (or prev section)))
-             (goto-char (pi-section-beginning (or prev section))))))))
+    (cond
+     ((null section)
+      (if (and pi-root-section
+               (not (null (pi-section-children pi-root-section))))
+          (goto-char (pi-section-beginning (car (last (pi-section-children pi-root-section)))))
+        (message "No previous section")))
+     ((= (point) (pi-section-beginning section))
+      (let ((prev (pi-prev-section (pi-current-section))))
+        (if prev
+            (goto-char (pi-section-beginning prev))
+          (message "No previous section"))))
+     (t
+      (let ((prev (pi-find-section-before (point)
+                                          (pi-section-children
+                                           section))))
+        (goto-char (pi-section-beginning (or prev section)))
+        (goto-char (pi-section-beginning (or prev section))))))))
 
 
 (defun pi-section-set-hidden (section hidden)
@@ -209,7 +226,7 @@
 (defun pi-toggle-section ()
   "Toggle hidden status of current section."
   (interactive)
-  (let ((section (pi-current-section)))
+  (when-let (section (pi-current-section))
     (when (pi-section-parent section)
       (goto-char (pi-section-beginning section))
       (pi-section-set-hidden section (not (pi-section-hidden section))))))
@@ -219,7 +236,7 @@
   (interactive)
   (save-excursion
     (goto-char (point-min))
-    (while (not (eobp))
+    (while (and (not (eobp)) (pi-current-section))
       (let ((section (pi-current-section)))
 	(pi-section-set-hidden section t))
       (forward-line 1))))
