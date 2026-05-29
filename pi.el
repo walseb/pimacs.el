@@ -79,6 +79,18 @@
   :type '(repeat string)
   :group 'pi)
 
+(defcustom pi-log-rpc nil
+  "When non-nil, log all RPC JSON to `pi-log-rpc-file'."
+  :type 'boolean
+  :group 'pi)
+
+(defvar pi-log-rpc-file "/tmp/pi.el.log"
+  "File to write RPC JSON log entries to.")
+
+(defun pi-maybe-log-rpc (json)
+  (when pi-log-rpc
+    (write-region (concat json "\n") nil pi-log-rpc-file t)))
+
 ;;; Utilities
 
 (defun pi-json-read-object ()
@@ -296,6 +308,7 @@ PRED is called with KEY VALUE."
          (command (append (list :id request-id :type type) args))
          (encoded-command (pi-json-encode command))
          (payload (concat encoded-command "\n")))
+    (pi-maybe-log-rpc encoded-command)
     (process-send-string (pi-current-agent) payload)
     (when callback
       (puthash request-id (cons (current-buffer) callback) pi-response-callbacks))))
@@ -334,7 +347,10 @@ PRED is called with KEY VALUE."
     (when (pi-enough-response-p)
       (search-forward "{")
       (backward-char 1)
-      (let ((response (pi-json-read-object)))
+      (let* ((raw-start (point))
+             (response (pi-json-read-object)))
+        (when pi-log-rpc
+          (pi-maybe-log-rpc (buffer-substring-no-properties raw-start (point))))
         (delete-region (point-min) (point))
         (when response
           (pi-dispatch response)))
