@@ -206,6 +206,7 @@ PRED is called with KEY VALUE."
 (pi-def-permanent-buffer-local pi-header-line-state nil)
 (pi-def-permanent-buffer-local pi-current-tool-read-filename nil)
 (pi-def-permanent-buffer-local pi-current-tool-section nil)
+(pi-def-permanent-buffer-local pi-agent-state nil)
 
 
 (defvar pi-event-listeners (make-hash-table :test 'equal))
@@ -271,12 +272,15 @@ PRED is called with KEY VALUE."
       (remhash request-id pi-response-callbacks))))
 
 (defun pi-dispatch-event (event)
-  (if-let (listener (gethash (cons (pi-project-name) (plist-get event :type)) pi-event-listeners))
+  (when-let (all-listener (gethash (cons (pi-project-name) t) pi-event-listeners))
+    (with-current-buffer (car all-listener)
+      (apply (cdr all-listener) (list event))))
+  (when-let (listener (gethash (cons (pi-project-name) (plist-get event :type)) pi-event-listeners))
     (with-current-buffer (car listener)
-      (apply (cdr listener) (list event)))
-    (message "Unhandled event %S" event)))
+      (apply (cdr listener) (list event)))))
 
 (defun pi-set-event-listener (name listener)
+  "Set `name' to t to receive all events"
   (puthash (cons (pi-project-name) name) (cons (current-buffer) listener) pi-event-listeners))
 
 (defun pi-dispatch (response)
@@ -575,13 +579,22 @@ PRED is called with KEY VALUE."
   (pi-set-event-listener "tool_execution_end" #'pi-handle-tool-execution-end)
 
   (pi-set-event-listener "auto_retry_start" #'pi-handle-auto-retry-start)
-  (pi-set-event-listener "auto_retry_end" #'pi-handle-auto-retry-end))
+  (pi-set-event-listener "auto_retry_end" #'pi-handle-auto-retry-end)
+  (pi-set-event-listener t #'pi-handle-agent-state))
 
 (defun pi-focus-prompt ()
   (interactive)
   (goto-char (widget-get pi-prompt-widget :from))
   (forward-char 6)
   (widget-end-of-line))
+
+(defun pi-format-state ()
+  (if pi-agent-state
+      (let ((state pi-agent-state))
+        (if (consp state)
+            (format "Pi %s(%s)" (car state) (cdr state))
+          (format "Pi %s" state)))
+    "Pi"))
 
 (defun pi-format-header ()
   "Format the header line from `pi-header-line-state'."
@@ -600,10 +613,12 @@ PRED is called with KEY VALUE."
          (usage-str (if ctx-tokens
                         (pi-format-number-short ctx-tokens)
                       "?")))
-    (let ((left (format "%s/%s (%s)"
-                       usage-str ctx-str
-                       (if auto-compact "auto" "manual")))
-          (right (format "(%s) %s • %s"
+    (let* ((state-str (pi-format-state))
+           (left (format "%s/%s (%s) • %s"
+                        usage-str ctx-str
+                        (if auto-compact "auto" "manual")
+                        state-str))
+           (right (format "(%s) %s • %s"
                         (or provider "?")
                         (or model-id "?")
                         (or thinking-level "?"))))
@@ -631,6 +646,19 @@ PRED is called with KEY VALUE."
      (pi-on-response-success-callback resp
        (setq stats-result (plist-get resp :data))
        (funcall try-update)))))
+
+(defun pi-handle-agent-state (event)
+  (cl-case (intern (plist-get event :type))
+    (agent_start (setq pi-agent-state 'thinking))
+    (agent_end (setq pi-agent-state nil))
+    (turn_start (setq pi-agent-state 'thinking))
+    (turn_end (setq pi-agent-state nil))
+    (tool_execution_start (setq pi-agent-state (cons 'tool (plist-get event :toolName))))
+    (tool_execution_end (setq pi-agent-state 'thinking))
+    (compaction_start (setq pi-agent-state 'compacting))
+    (compaction_end (setq pi-agent-state 'thinking))
+    (auto_retry_start (setq pi-agent-state 'retrying))
+    (auto_retry_end (setq pi-agent-state 'thinking))))
 
 (defun pi-cleanup-chat-buffer ()
   (let ((project-name (pi-project-name)))
