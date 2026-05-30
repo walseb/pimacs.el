@@ -31,6 +31,7 @@
 (require 'project)
 (require 'widget)
 (require 'wid-edit)
+(require 'ring)
 (require 'markdown-mode)
 (require 'pi-section)
 
@@ -82,6 +83,11 @@
 (defcustom pi-log-rpc nil
   "When non-nil, log all RPC JSON to `pi-log-rpc-file'."
   :type 'boolean
+  :group 'pi)
+
+(defcustom pi-prompt-history-max-size 500
+  "Maximum number of prompt history entries to keep."
+  :type 'integer
   :group 'pi)
 
 (defvar pi-log-rpc-file "/tmp/pi.el.log"
@@ -226,6 +232,43 @@ PRED is called with KEY VALUE."
 (defvar pi-agent-buffer-name "*pi-agent*")
 (defvar pi-chat-buffer-name "*pi-chat*")
 (defvar pi-request-counter 0)
+
+;;; History
+
+(pi-def-permanent-buffer-local pi-prompt-history nil)
+(pi-def-permanent-buffer-local pi-prompt-history-index 0)
+
+(defun pi-previous-prompt ()
+  "Navigate to the previous prompt in history."
+  (interactive)
+  (let ((len (ring-length pi-prompt-history)))
+    (when (< pi-prompt-history-index len)
+      (cl-incf pi-prompt-history-index)
+      (widget-value-set pi-prompt-widget
+                        (ring-ref pi-prompt-history (- pi-prompt-history-index 1))))))
+
+(defun pi-next-prompt ()
+  "Navigate to the next prompt in history."
+  (interactive)
+  (cond
+   ((> pi-prompt-history-index 1)
+    (cl-decf pi-prompt-history-index)
+    (widget-value-set pi-prompt-widget
+                      (ring-ref pi-prompt-history (1- pi-prompt-history-index))))
+   ((= pi-prompt-history-index 1)
+    (setq pi-prompt-history-index 0)
+    (widget-value-set pi-prompt-widget ""))))
+
+(defun pi-search-prompt ()
+  "Search prompt history and select an entry."
+  (interactive)
+  (let ((items (ring-elements pi-prompt-history)))
+    (if (null items)
+        (message "No prompt history")
+      (let ((selected (completing-read "Search prompt: " items nil t)))
+        (widget-value-set pi-prompt-widget selected)
+        (setq pi-prompt-history-index 0)
+        (pi-focus-prompt)))))
 
 ;;; Core
 
@@ -688,11 +731,17 @@ PRED is called with KEY VALUE."
 
 (defun pi-send-prompt (&optional prompt)
   (interactive "sPrompt: ")
-  (pi-with-chat-buffer
-    (pi-send-command
-     "prompt" (list :message prompt)
-     (pi-on-response-success-callback resp
-       (widget-value-set pi-prompt-widget "")))))
+  (if (or (null prompt) (string-empty-p prompt))
+      (message "No prompt to send")
+    (pi-with-chat-buffer
+      (pi-send-command
+       "prompt" (list :message prompt)
+       (pi-on-response-success-callback resp
+         (widget-value-set pi-prompt-widget "")
+         (unless (and (> (ring-length pi-prompt-history) 0)
+                      (equal prompt (ring-ref pi-prompt-history 0)))
+           (ring-insert pi-prompt-history prompt))
+         (setq pi-prompt-history-index 0))))))
 
 (defun pi-abort ()
   (interactive)
@@ -812,8 +861,9 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 (defvar pi-chat-widget-field-keymap
   (let ((map (make-composed-keymap nil widget-field-keymap)))
     (keymap-set map "C-g" #'pi-abort)
-    (keymap-set map "M-p" #'pi-goto-previous-section)
-    (keymap-set map "M-n" #'pi-goto-next-section)
+    (keymap-set map "M-p" #'pi-previous-prompt)
+    (keymap-set map "M-n" #'pi-next-prompt)
+    (keymap-set map "C-r" #'pi-search-prompt)
     map))
 
 (define-derived-mode pi-chat-mode nil "pi-chat"
@@ -822,6 +872,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 \\{pi-chat-mode-map}"
   (setq header-line-format '(:eval (pi-format-header)))
   (setq pi-root-section (pi-create-root-section))
+  (setq pi-prompt-history (make-ring pi-prompt-history-max-size))
   (setq pi-prompt-widget
         (widget-create 'editable-field
                        :keymap pi-chat-widget-field-keymap
