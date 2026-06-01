@@ -305,10 +305,18 @@ PRED is called with KEY VALUE."
 (defmacro pi-widget-save-excursion (&rest body)
   "Insert content before PROMPT-WIDGET and restore focus afterward."
   (declare (indent 0) (debug t))
-  `(let ((inhibit-read-only t))
+  `(let* ((inhibit-read-only t)
+          (window (get-buffer-window (current-buffer) t))
+          (follow-p
+           (and window
+                (>= (window-point window)
+                    (widget-get pi-prompt-widget :from)))))
      (save-excursion
        (goto-char (widget-get pi-prompt-widget :from))
-       ,@body)))
+       ,@body)
+     (when follow-p
+       (with-selected-window window
+         (recenter (- -1 scroll-margin))))))
 
 (defmacro pi-with-chat-buffer (&rest body)
   "Execute the body in the current chat buffer"
@@ -1063,7 +1071,6 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
   "Major mode for pi chat.
 
 \\{pi-chat-mode-map}"
-  (setq scroll-up-aggressively 0.2)
   (buffer-disable-undo)
   (setq header-line-format '(:eval (pi-format-header)))
   (pi-create-root-section)
