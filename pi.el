@@ -107,6 +107,19 @@
   :type 'integer
   :group 'pi)
 
+(defcustom pi-prompt-streaming-behavior 'followUp
+  "Default streaming behavior for prompts.
+
+`steer': Queue the message while the agent is running.  It is delivered
+after the current assistant turn finishes executing its tool calls,
+before the next LLM call.
+
+`followUp': Wait until the agent finishes.  Message is delivered only
+when agent stops."
+  :type '(choice (const :tag "Follow up" followUp)
+                 (const :tag "Steer" steer))
+  :group 'pi)
+
 (defvar pi-log-rpc-file "/tmp/pi.el.log"
   "File to write RPC JSON log entries to.")
 
@@ -780,6 +793,21 @@ PRED is called with KEY VALUE."
           (pi-insert-error
            (format "Error: Retry failed after %d attempts: %s\n\n" attempt final-error)))))))
 
+(defun pi-handle-queue-update (event)
+  (let* ((steering (plist-get event :steering))
+         (follow-up (plist-get event :followUp))
+         (has-content (or (consp steering)
+                          (consp follow-up))))
+    (when has-content
+      (pi-widget-save-excursion
+        (pi-create-section "queue" 'queue pi-root-section
+          (insert (propertize "queue\n" 'face 'bold))
+          (dolist (item steering)
+            (insert (propertize (format " Steering: %s\n" item) 'face 'pi-thinking-face)))
+          (dolist (item follow-up)
+            (insert (propertize (format " Follow-up: %s\n" item) 'face 'pi-thinking-face)))
+          (insert "\n"))))))
+
 (defun pi-handle-compaction-end (event)
   (let* ((result (plist-get event :result))
          (error-message (plist-get event :errorMessage)))
@@ -810,6 +838,7 @@ PRED is called with KEY VALUE."
   (pi-set-event-listener "auto_retry_start" #'pi-handle-auto-retry-start)
   (pi-set-event-listener "auto_retry_end" #'pi-handle-auto-retry-end)
 
+  (pi-set-event-listener "queue_update" #'pi-handle-queue-update)
   (pi-set-event-listener "compaction_end" #'pi-handle-compaction-end)
   (pi-set-event-listener t #'pi-handle-agent-state))
 
@@ -900,19 +929,33 @@ PRED is called with KEY VALUE."
 
 ;;; Commands
 
-(defun pi-send-prompt (&optional prompt)
+(defun pi-send-prompt (&optional prompt streaming-behavior)
   (interactive "sPrompt: ")
   (if (or (null prompt) (string-empty-p prompt))
       (message "No prompt to send")
     (pi-with-chat-buffer
       (pi-send-command
-       "prompt" (list :message prompt)
+       "prompt" (list :message prompt
+                      :streamingBehavior (when-let (behavior (or streaming-behavior pi-prompt-streaming-behavior))
+                                           (symbol-name behavior)))
        (pi-on-response-success-callback resp
          (widget-value-set pi-prompt-widget "")
          (unless (and (> (ring-length pi-prompt-history) 0)
                       (equal prompt (ring-ref pi-prompt-history 0)))
            (ring-insert pi-prompt-history prompt))
          (setq pi-prompt-history-index 0))))))
+
+(defun pi-send-prompt-alternate (&optional prompt)
+  "Send PROMPT with the alternative streaming behavior.
+
+If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
+  (interactive)
+  (let* ((alt-behavior (if (eq pi-prompt-streaming-behavior 'followUp)
+                           'steer
+                         'followUp))
+         (prompt-text (or prompt (widget-value pi-prompt-widget))))
+    (when (and prompt-text (not (string-empty-p prompt-text)))
+      (pi-send-prompt prompt-text alt-behavior))))
 
 (defun pi-abort ()
   (interactive)
@@ -1258,6 +1301,7 @@ summarization."
     (keymap-set map "M-p" #'pi-previous-prompt)
     (keymap-set map "M-n" #'pi-next-prompt)
     (keymap-set map "C-r" #'pi-search-prompt)
+    (keymap-set map "M-RET" #'pi-send-prompt-alternate)
     map))
 
 (define-derived-mode pi-chat-mode nil "pi-chat"
