@@ -120,6 +120,22 @@ when agent stops."
                  (const :tag "Steer" steer))
   :group 'pi)
 
+(defvar pi-slash-commands
+  '(("model" pi-select-model 0)
+    ("new" pi-new-session 0)
+    ("resume" pi-resume 0)
+    ("compact" pi-compact 1)
+    ("session" pi-session-stats 0)
+    ("thinking-level" pi-set-thinking-level 0)
+    ("quit" pi-quit-chat 0)
+    ("exit" pi-quit-chat 0))
+  "Alist mapping slash command names to command specs.
+
+Each entry is (NAME COMMAND MAX-ARGS) where NAME is the command
+string without the leading slash, COMMAND is a command symbol,
+and MAX-ARGS is 0 or 1 indicating the number of optional string
+arguments the command accepts.")
+
 (defvar pi-log-rpc-file "/tmp/pi.el.log"
   "File to write RPC JSON log entries to.")
 
@@ -398,7 +414,7 @@ PRED is called with KEY VALUE."
 
 (defun pi-send-command (type args &optional callback)
   (unless (pi-current-agent)
-    (error "Agent does not exist. Run M-x pi-restart-agent to start it again"))
+    (error "Agent does not exist. Run M-x pi-restart-chat to start it again"))
 
   (let* ((request-id (pi-next-request-id))
          (command (append (list :id request-id :type type) args))
@@ -491,16 +507,8 @@ PRED is called with KEY VALUE."
 
 (defun pi-kill-agent ()
   "Kill the agent in the current buffer."
-  (interactive)
   (when-let (agent (pi-current-agent))
     (delete-process agent)))
-
-(defun pi-restart-agent ()
-  "Restarts pi agent."
-  (interactive)
-  (pi-kill-agent)
-  (pi-start-agent))
-
 
 ;;; Completion
 
@@ -519,7 +527,7 @@ PRED is called with KEY VALUE."
       (let ((candidates (file-name-all-completions file full-dir)))
         (mapcar (lambda (c) (concat dir c)) candidates)))))
 
-(defun pi-completion-at-point ()
+(defun pi-completion-at-point-file ()
   (let ((end (point)))
     (save-excursion
       (when (re-search-backward "@\\([^\t\n ]*\\)" (line-beginning-position) t)
@@ -531,6 +539,14 @@ PRED is called with KEY VALUE."
                   (pi-native-file-completions prefix))))
           (when completions
             (list start end completions :category 'file)))))))
+
+(defun pi-completion-at-point-slash ()
+  (let ((end (point)))
+    (save-excursion
+      (when (re-search-backward "\\([ \t]*\\)/\\([-a-zA-Z0-9]*\\)" (line-beginning-position) t)
+        (let ((start (match-beginning 2))
+              (names (mapcar #'car pi-slash-commands)))
+          (list start end names))))))
 
 ;;; Chat
 
@@ -929,21 +945,48 @@ PRED is called with KEY VALUE."
 
 ;;; Commands
 
+(defun pi-parse-slash-command (prompt)
+  (when (string-match "^[ \t]*/\\([-a-zA-Z0-9]+\\)\\([ \t].*\\)?$" prompt)
+    (let* ((name (match-string-no-properties 1 prompt))
+           (raw (and (match-beginning 2)
+                     (string-trim-left (match-string-no-properties 2 prompt))))
+           (args (and (not (string-empty-p raw)) raw))
+           (cell (assoc name pi-slash-commands #'string-equal)))
+      (when cell
+        (let ((cmd (cadr cell))
+              (max-args (nth 2 cell)))
+          (when (and args (not (eq max-args 1)))
+            (error "Slash command \"/%s\" does not accept arguments" name))
+          (cons cmd args))))))
+
+(defun pi-clear-prompt (prompt)
+  (widget-value-set pi-prompt-widget "")
+  (unless (and (> (ring-length pi-prompt-history) 0)
+               (equal prompt (ring-ref pi-prompt-history 0)))
+    (ring-insert pi-prompt-history prompt))
+  (setq pi-prompt-history-index 0))
+
 (defun pi-send-prompt (&optional prompt streaming-behavior)
   (interactive "sPrompt: ")
   (if (or (null prompt) (string-empty-p prompt))
       (message "No prompt to send")
-    (pi-with-chat-buffer
-      (pi-send-command
-       "prompt" (list :message prompt
-                      :streamingBehavior (when-let (behavior (or streaming-behavior pi-prompt-streaming-behavior))
-                                           (symbol-name behavior)))
-       (pi-on-response-success-callback resp
-         (widget-value-set pi-prompt-widget "")
-         (unless (and (> (ring-length pi-prompt-history) 0)
-                      (equal prompt (ring-ref pi-prompt-history 0)))
-           (ring-insert pi-prompt-history prompt))
-         (setq pi-prompt-history-index 0))))))
+    (let ((slash (pi-parse-slash-command prompt)))
+      (if slash
+          (progn
+            (let ((cmd (car slash))
+                  (args (cdr slash)))
+              (if (null args)
+                  (call-interactively cmd)
+                (apply cmd (list args))))
+            (pi-clear-prompt prompt))
+        (pi-with-chat-buffer
+          (pi-send-command
+           "prompt" (list :message prompt
+                          :streamingBehavior (when-let (behavior (or streaming-behavior pi-prompt-streaming-behavior))
+                                               (symbol-name behavior)))
+           (pi-on-response-success-callback resp
+             (pi-clear-prompt prompt))))))))
+
 
 (defun pi-send-prompt-alternate (&optional prompt)
   "Send PROMPT with the alternative streaming behavior.
@@ -1313,7 +1356,9 @@ summarization."
   (pi-create-root-section)
   (setq pi-prompt-history (make-ring pi-prompt-history-max-size))
   (setq-local completion-at-point-functions
-              (cons #'pi-completion-at-point completion-at-point-functions))
+              (append (list #'pi-completion-at-point-slash
+                            #'pi-completion-at-point-file)
+                      completion-at-point-functions))
   (setq pi-prompt-widget
         (widget-create 'editable-field
                        :keymap pi-chat-widget-field-keymap
