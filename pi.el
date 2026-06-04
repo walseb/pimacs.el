@@ -223,7 +223,7 @@ PRED is called with KEY VALUE."
          (when-let (err (plist-get ,resp-sym :error))
            (pi-widget-save-excursion
              (pi-create-section "error" 'error pi-root-section
-               (pi-insert-error (format "%s\n\n" err))))
+               (pi-insert-error (format "%s" err))))
            nil)))))
 
 (defmacro pi-on-response-success-callback (response &rest body)
@@ -238,7 +238,7 @@ PRED is called with KEY VALUE."
      (if (eq cancelled t)
          (pi-widget-save-excursion
            (pi-create-section "error" 'error pi-root-section
-             (pi-insert-error (format "%s cancelled.\n\n" ,operation))))
+             (pi-insert-error (format "%s cancelled." ,operation))))
        ,@body)))
 
 (defun pi-render-markdown (text)
@@ -621,9 +621,6 @@ PRED is called with KEY VALUE."
 (defun pi-insert-thinking (text)
   (insert (propertize text 'face 'pi-thinking-face)))
 
-(defun pi-insert-message-tail ()
-  (insert "\n\n"))
-
 (defun pi-insert-tool-name (tool-name)
   (insert (propertize (format "%s " tool-name) 'face 'pi-tool-name-face)))
 
@@ -640,11 +637,10 @@ PRED is called with KEY VALUE."
         (when (not (string-empty-p result-text))
           (insert (format "%s\n" result-text)))))
       (when (and (numberp exit-code) (not (zerop exit-code)))
-        (pi-insert-error (format "Command exited with code %d\n\n" exit-code)))
+        (pi-insert-error (format "Command exited with code %d" exit-code)))
       (when full-output-path
         (insert "Output truncated. See full output at: ")
-        (pi-insert-file-link full-output-path)
-        (pi-insert-message-tail))))
+        (pi-insert-file-link full-output-path))))
    ((eq is-error t)
     (when (not (string-empty-p result-text))
       (pi-insert-error (format "%s\n" result-text))))
@@ -674,8 +670,7 @@ PRED is called with KEY VALUE."
          (pi-widget-save-excursion
            (pi-create-section "user" 'user pi-root-section
              (pi-insert-role-prefix "user")
-             (insert text)
-             (pi-insert-message-tail))))))
+             (insert text))))))
 
     ("assistant"
      (let ((thinking-text (pi-content-thinking message))
@@ -685,14 +680,12 @@ PRED is called with KEY VALUE."
          (pi-widget-save-excursion
            (pi-create-section "thinking" 'thinking pi-root-section
              (pi-insert-role-prefix "assistant")
-             (pi-insert-thinking thinking-text)
-             (pi-insert-message-tail))))
+             (pi-insert-thinking thinking-text))))
        (unless (string-empty-p text)
          (pi-widget-save-excursion
            (pi-create-section "text" 'text pi-root-section
              (pi-insert-role-prefix "assistant")
-             (insert (pi-render-markdown text))
-             (pi-insert-message-tail))))
+             (insert (pi-render-markdown text)))))
        (when tool-call
          (let ((tool-name (plist-get tool-call :name))
                (args (plist-get tool-call :arguments)))
@@ -720,7 +713,6 @@ PRED is called with KEY VALUE."
 (defun pi-handle-message-update (event)
   (let* ((message (plist-get event :message))
          (role (pi-message-role message))
-         (type (plist-get event :type))
          (thinking-text (pi-content-thinking message))
          (text (pi-content-text message)))
     (when (member role '("assistant" "user"))
@@ -729,36 +721,48 @@ PRED is called with KEY VALUE."
           (if pi-thinking-section
               (pi-replace-section pi-thinking-section
                 (pi-insert-role-prefix role)
-                (pi-insert-thinking thinking-text)
-                (pi-insert-message-tail))
+                (pi-insert-thinking thinking-text))
             (setq pi-thinking-section (pi-new-section "thinking" 'thinking pi-root-section))
             (pi-insert-section pi-thinking-section
               (pi-insert-role-prefix role)
-              (pi-insert-thinking thinking-text)
-              (pi-insert-message-tail)))))
+              (pi-insert-thinking thinking-text)))))
 
       (unless (string-empty-p text)
         (pi-widget-save-excursion
           (if pi-text-section
               (pi-replace-section pi-text-section
                 (pi-insert-role-prefix role)
-                (insert text)
-                (pi-insert-message-tail))
+                (insert text))
             (setq pi-text-section (pi-new-section "text" 'text pi-root-section))
             (pi-insert-section pi-text-section
               (pi-insert-role-prefix role)
-              (insert text)
-              (pi-insert-message-tail))))))
-    (when (equal type "message_end")
-      (when (and (equal role "assistant") (not (string-empty-p text)))
+              (insert text))))))))
+
+(defun pi-handle-message-end (event)
+  (let* ((message (plist-get event :message))
+         (role (pi-message-role message))
+         (thinking-text (pi-content-thinking message))
+         (text (pi-content-text message)))
+    (when (member role '("assistant" "user"))
+      (unless (string-empty-p thinking-text)
         (pi-widget-save-excursion
-          (pi-replace-section pi-text-section
+          (pi-create-or-replace-section pi-thinking-section "thinking" 'thinking pi-root-section
             (pi-insert-role-prefix role)
-            (insert (pi-render-markdown text))
-            (pi-insert-message-tail))))
-      ;; Cleanup tracking state
-      (setq pi-text-section nil
-            pi-thinking-section nil))))
+            (pi-insert-thinking thinking-text))))
+
+      (unless (string-empty-p text)
+        (pi-widget-save-excursion
+          (pi-create-or-replace-section pi-text-section "text" 'text pi-root-section
+            (pi-insert-role-prefix role)
+            (insert text)))))
+    (when (and (equal role "assistant") (not (string-empty-p text)))
+      (pi-widget-save-excursion
+        (pi-replace-section pi-text-section
+          (pi-insert-role-prefix role)
+          (insert (pi-render-markdown text)))))
+    ;; Cleanup tracking state
+    (setq pi-text-section nil
+          pi-thinking-section nil)))
 
 
 (defun pi-format-tool-args (tool-name args)
@@ -828,7 +832,7 @@ PRED is called with KEY VALUE."
         (pi-create-section "error" 'error pi-root-section
           (pi-insert-error (format "Error: %s\n\n" error-message))
           (insert
-           (propertize (format "Retrying %d/%d (waiting %ds)…\n\n" attempt max-attempts (/ delay-ms 1000))
+           (propertize (format "Retrying %d/%d (waiting %ds)…" attempt max-attempts (/ delay-ms 1000))
                        'face 'pi-thinking-face)))))))
 
 (defun pi-handle-auto-retry-end (event)
@@ -839,7 +843,7 @@ PRED is called with KEY VALUE."
       (pi-widget-save-excursion
         (pi-create-section "error" 'error pi-root-section
           (pi-insert-error
-           (format "Error: Retry failed after %d attempts: %s\n\n" attempt final-error)))))))
+           (format "Error: Retry failed after %d attempts: %s" attempt final-error)))))))
 
 (defun pi-handle-queue-update (event)
   (let* ((steering (plist-get event :steering))
@@ -863,22 +867,20 @@ PRED is called with KEY VALUE."
      (error-message
       (pi-widget-save-excursion
         (pi-create-section "error" 'error pi-root-section
-          (pi-insert-error error-message)
-          (pi-insert-message-tail))))
+          (pi-insert-error error-message))))
      (result
       (let* ((summary (plist-get result :summary))
              (tokens-before (plist-get result :tokensBefore))
-             (header (format "**Compacted from %s tokens**\n\n"
+             (header (format "**Compacted from %s tokens**"
                              (pi-format-number-short tokens-before))))
         (pi-widget-save-excursion
           (pi-create-section "compact" 'compact pi-root-section
             (pi-insert-role-prefix "assistant")
-            (insert (pi-render-markdown (concat header summary)))
-            (pi-insert-message-tail))))))))
+            (insert (pi-render-markdown (concat header summary))))))))))
 
 (defun pi-register-event-listeners ()
   (pi-set-event-listener "message_update" #'pi-handle-message-update)
-  (pi-set-event-listener "message_end" #'pi-handle-message-update)
+  (pi-set-event-listener "message_end" #'pi-handle-message-end)
 
   (pi-set-event-listener "tool_execution_start" #'pi-handle-tool-execution-start)
   (pi-set-event-listener "tool_execution_end" #'pi-handle-tool-execution-end)
@@ -1065,7 +1067,7 @@ If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
      (pi-on-response-success-callback resp
        (pi-widget-save-excursion
          (pi-create-section "error" 'error pi-root-section
-           (pi-insert-error "Aborted.\n\n"))))))
+           (pi-insert-error "Aborted."))))))
   (keyboard-quit))
 
 (defun pi-insert-stats-section (header plist fields)
@@ -1122,9 +1124,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
               (propertize "Cost\n" 'face 'bold))
 
              (insert
-              (format " Total: %.4f\n" cost))
-
-             (insert "\n\n"))))))))
+              (format " Total: %.4f\n" cost)))))))))
 
 (defun pi-select-model ()
   (interactive)
@@ -1151,7 +1151,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                 (pi-update-header-line)
                 (pi-widget-save-excursion
                   (pi-create-section "model" 'model pi-root-section
-                    (insert (format "Switched to model: (%s) %s\n\n" provider model-id)))))))))))))
+                    (insert (format "Switched to model: (%s) %s" provider model-id)))))))))))))
 
 (defvar pi-thinking-level-descriptions
   '((:off     . "No reasoning")
@@ -1212,7 +1212,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                 (pi-update-header-line)
                 (pi-widget-save-excursion
                   (pi-create-section "thinking" 'thinking pi-root-section
-                    (insert (format "Thinking level set to: %s\n\n" selected-str)))))))))))))
+                    (insert (format "Thinking level set to: %s" selected-str)))))))))))))
 
 (cl-defstruct pi-session-choice
   id message timestamp cwd path parent-id)
@@ -1337,7 +1337,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
          (pi-refresh-session)
          (pi-widget-save-excursion
            (pi-create-section "info" 'info pi-root-section
-             (insert "Session cloned.\n\n"))))))))
+             (insert "Session cloned."))))))))
 
 (defun pi-new-session ()
   (interactive)
@@ -1360,7 +1360,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
          (pi-on-response-success-callback resp
            (pi-widget-save-excursion
              (pi-create-section "info" 'info pi-root-section
-               (insert (format "Session renamed to: %s\n\n" trimmed))))))))))
+               (insert (format "Session renamed to: %s" trimmed))))))))))
 
 
 (defun pi-export (&optional output-path)
@@ -1379,8 +1379,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
            (pi-widget-save-excursion
              (pi-create-section "export" 'info pi-root-section
                (insert "Session exported to: ")
-               (pi-insert-file-link path)
-               (pi-insert-message-tail)))))))))
+               (pi-insert-file-link path)))))))))
 
 (defun pi-copy ()
   "Copy the last assistant message to the clipboard."
@@ -1421,8 +1420,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                     (pi-refresh-session)
                     (pi-widget-save-excursion
                       (pi-create-section "fork" 'fork pi-root-section
-                        (insert text)
-                        (pi-insert-message-tail))))))))))))))
+                        (insert text))))))))))))))
 
 (defun pi-compact (&optional custom-instructions)
   "Compact the current session to reduce context usage.

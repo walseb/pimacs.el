@@ -8,14 +8,13 @@
 (package-initialize)
 
 (require 'pi-section)
-
-(defvar pi-root-section nil)
+(setq pi-section-padding "")
 
 (defmacro pi-section-tests-with-demo-buffer (&rest body)
   (declare (indent 0))
   `(with-temp-buffer
-     (let* ((pi-root-section (pi-create-root-section))
-            (build (pi-new-section "Build" 'build pi-root-section))
+     (pi-create-root-section)
+     (let* ((build (pi-new-section "Build" 'build pi-root-section))
             (compile (pi-new-section "Compile" 'compile build))
             (tests (pi-new-section "Tests" 'test build))
             (unit-tests (pi-new-section "Unit Tests" 'test tests))

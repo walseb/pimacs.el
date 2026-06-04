@@ -2,6 +2,12 @@
 
 (require 'cl-lib)
 
+(defcustom pi-section-padding "\n\n"
+  "String inserted between sections to control the visual gap.
+Increase or decrease this value to adjust spacing between sections."
+  :type 'string
+  :group 'pi)
+
 (defvar pi-section-hidden-default nil)
 (defvar-local pi-root-section nil)
 
@@ -49,6 +55,7 @@
     `(let* ((,s ,section))
        (setf (pi-section-beginning ,s) (point-marker))
        ,@body
+       (insert pi-section-padding)
        (setf (pi-section-beginning ,s) (pi-advance-pointer-maker (pi-section-beginning ,s)))
        (pi-update-section-end ,s (point-marker))
        (pi-propertize-section ,s)
@@ -68,8 +75,9 @@
            (debug (symbolp body)))
   (let ((s (make-symbol "*section*")))
     `(let* ((,s ,section))
-       (goto-char (pi-section-end ,s))
+       (goto-char (- (pi-section-end ,s) (length pi-section-padding)))
        ,@body
+       (forward-char (length pi-section-padding))
        (pi-update-section-end ,s (point-marker))
        (pi-propertize-section ,s)
        ,s)))
@@ -84,6 +92,7 @@
        (goto-char (pi-section-beginning ,s))
        (setf (pi-section-beginning ,s) (point-marker))
        ,@body
+       (insert pi-section-padding)
        (setf (pi-section-beginning ,s) (pi-advance-pointer-maker (pi-section-beginning ,s)))
        (pi-update-section-end ,s (point-marker))
        (pi-propertize-section ,s)
@@ -98,6 +107,13 @@
       (setf (pi-section-children parent)
             (delq section (pi-section-children parent)))
       (pi-update-section-end parent beg))))
+
+(defmacro pi-create-or-replace-section (section title type parent &rest body)
+  (declare (indent 4)
+           (debug (symbolp body)))
+  `(if ,section
+       (pi-replace-section ,section ,@body)
+     (pi-create-section ,title ,type ,parent ,@body)))
 
 (defun pi-update-section-end (section end)
   (when section
@@ -258,7 +274,8 @@
     (with-current-buffer buf
       (setq buffer-read-only nil)
       (erase-buffer)
-      (let* ((root (pi-create-root-section))
+      (let* ((pi-section-padding "\n")
+             (root (pi-create-root-section))
              (build (pi-new-section "Build" 'build root))
              (compile (pi-new-section "Compile" 'compile build))
              (tests (pi-new-section "Tests" 'test build))
