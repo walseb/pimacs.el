@@ -285,6 +285,8 @@ PRED is called with KEY VALUE."
 
 ;;; State management
 
+(cl-defstruct pi-tool-call
+  call-section result-section prev-text tool-name args)
 
 (defvar pi-agents (make-hash-table :test 'equal))
 (defvar pi-chats (make-hash-table :test 'equal))
@@ -295,8 +297,7 @@ PRED is called with KEY VALUE."
 (pi-def-permanent-buffer-local pi-text-section nil)
 (pi-def-permanent-buffer-local pi-thinking-section nil)
 (pi-def-permanent-buffer-local pi-header-line-state nil)
-(pi-def-permanent-buffer-local pi-current-tool-read-filename nil)
-(pi-def-permanent-buffer-local pi-current-tool-section nil)
+(pi-def-permanent-buffer-local pi-tool-calls nil)
 (pi-def-permanent-buffer-local pi-agent-state nil)
 (pi-def-permanent-buffer-local pi-bash-in-progress nil)
 (pi-def-permanent-buffer-local pi-retry-in-progress nil)
@@ -609,8 +610,8 @@ PRED is called with KEY VALUE."
 (defun pi-content-thinking (message)
   (pi-content-join message "thinking"))
 
-(defun pi-content-tool-call (message)
-  (cl-find-if
+(defun pi-content-tool-calls (message)
+  (cl-remove-if-not
    (lambda (item)
      (equal (plist-get item :type) "toolCall"))
    (plist-get message :content)))
@@ -624,7 +625,7 @@ PRED is called with KEY VALUE."
 (defun pi-insert-tool-name (tool-name)
   (insert (propertize (format "%s " tool-name) 'face 'pi-tool-name-face)))
 
-(defun pi-insert-tool-result (tool-name result-text is-error &optional details)
+(defun pi-insert-tool-result (tool-name result-text is-error &optional details args)
   (cond
    ((string= tool-name "bash")
     (let* ((exit-code (plist-get details :exitCode))
@@ -632,10 +633,10 @@ PRED is called with KEY VALUE."
       (cond
        ((eq is-error t)
         (when (not (string-empty-p result-text))
-          (pi-insert-error (format "%s\n" result-text))))
+          (pi-insert-error (format "%s" result-text))))
        (t
         (when (not (string-empty-p result-text))
-          (insert (format "%s\n" result-text)))))
+          (insert (format "%s" result-text)))))
       (when (and (numberp exit-code) (not (zerop exit-code)))
         (pi-insert-error (format "Command exited with code %d" exit-code)))
       (when full-output-path
@@ -643,24 +644,24 @@ PRED is called with KEY VALUE."
         (pi-insert-file-link full-output-path))))
    ((eq is-error t)
     (when (not (string-empty-p result-text))
-      (pi-insert-error (format "%s\n" result-text))))
+      (pi-insert-error (format "%s" result-text))))
    ((string= tool-name "read")
-    (when (and (not (string-empty-p result-text)) pi-current-tool-read-filename)
-      (let ((truncated-line nil))
-        (when (string-match "\n\\(\\[.*more lines.*continue.\\]\\)$" result-text)
-          (setq truncated-line (match-string 1 result-text)
-                result-text (replace-match "" nil nil result-text)))
-        (insert (pi-render-content pi-current-tool-read-filename result-text))
-        (insert (format "%s\n" (or truncated-line ""))))))
+    (when-let ((path (plist-get args :path)))
+      (when (not (string-empty-p result-text))
+        (let ((truncated-line nil))
+          (when (string-match "\n\\(\\[.*more lines.*continue.\\]\\)$" result-text)
+            (setq truncated-line (match-string 1 result-text)
+                  result-text (replace-match "" nil nil result-text)))
+          (insert (pi-render-content (expand-file-name path (pi-project-root)) result-text))
+          (insert (format "%s" (or truncated-line "")))))))
    ((string= tool-name "edit")
     (when-let ((diff (plist-get details :diff)))
-      (insert (pi-render-diff diff))
-      (insert "\n"))
+      (insert (pi-render-diff diff)))
     (when (not (string-empty-p result-text))
-      (insert (format "%s\n" result-text))))
+      (insert (format "%s" result-text))))
    (t
     (when (not (string-empty-p result-text))
-      (insert (format "%s\n" result-text))))))
+      (insert (format "%s" result-text))))))
 
 (defun pi-insert-message (message)
   (pcase (pi-message-role message)
@@ -675,7 +676,7 @@ PRED is called with KEY VALUE."
     ("assistant"
      (let ((thinking-text (pi-content-thinking message))
            (text (pi-content-text message))
-           (tool-call (pi-content-tool-call message)))
+           (tool-calls (pi-content-tool-calls message)))
        (unless (string-empty-p thinking-text)
          (pi-widget-save-excursion
            (pi-create-section "thinking" 'thinking pi-root-section
@@ -686,28 +687,37 @@ PRED is called with KEY VALUE."
            (pi-create-section "text" 'text pi-root-section
              (pi-insert-role-prefix "assistant")
              (insert (pi-render-markdown text)))))
-       (when tool-call
-         (let ((tool-name (plist-get tool-call :name))
+       (dolist (tool-call tool-calls)
+         (let ((tool-call-id (plist-get tool-call :id))
+               (tool-name (plist-get tool-call :name))
                (args (plist-get tool-call :arguments)))
-           (when (string= tool-name "read")
-             (setq pi-current-tool-read-filename (plist-get args :path)))
            (pi-widget-save-excursion
-             (setq pi-current-tool-section (pi-new-section tool-name 'tool pi-root-section))
-             (pi-insert-section pi-current-tool-section
-               (pi-insert-tool-name tool-name)
-               (pi-format-tool-args tool-name args)))))))
-
+             (let ((call-section (pi-new-section tool-name 'tool pi-root-section)))
+               (pi-insert-section call-section
+                 (pi-insert-tool-name tool-name)
+                 (pi-format-tool-args tool-name args))
+               (let ((result-section (pi-new-section "result" 'tool-execution call-section)))
+                 (pi-insert-section result-section)
+                 (puthash tool-call-id
+                          (make-pi-tool-call
+                           :call-section call-section
+                           :result-section result-section
+                           :prev-text ""
+                           :tool-name tool-name
+                           :args args)
+                          pi-tool-calls))))))))
     ("toolResult"
-     (let ((tool-name (plist-get message :toolName))
+     (let ((tool-call-id (plist-get message :toolCallId))
+           (tool-name (plist-get message :toolName))
            (result-text (pi-content-text message))
            (is-error (plist-get message :isError))
            (details (plist-get message :details)))
-       (when pi-current-tool-section
+       (when-let ((entry (gethash tool-call-id pi-tool-calls)))
          (pi-widget-save-excursion
-           (pi-append-section pi-current-tool-section
-             (pi-insert-tool-result tool-name result-text is-error details))))
-       (setq pi-current-tool-section nil
-             pi-current-tool-read-filename nil)))))
+           (pi-replace-section (pi-tool-call-result-section entry)
+             (pi-insert-tool-result tool-name result-text is-error details (pi-tool-call-args entry))))
+         (remhash tool-call-id pi-tool-calls))))))
+
 
 
 (defun pi-handle-message-update (event)
@@ -737,7 +747,28 @@ PRED is called with KEY VALUE."
                (setq pi-text-section (pi-new-section "text" 'text pi-root-section))
                (pi-insert-section pi-text-section
                  (pi-insert-role-prefix role)
-                 (insert delta))))))))))
+                 (insert delta))))))
+        ("toolcall_end"
+         (let* ((tool-call (plist-get assistant-message-event :toolCall))
+                (tool-call-id (plist-get tool-call :id))
+                (tool-name (plist-get tool-call :name))
+                (args (plist-get tool-call :arguments)))
+           (pi-widget-save-excursion
+             (let ((call-section (pi-new-section tool-name 'tool pi-root-section)))
+               (pi-insert-section call-section
+                 (pi-insert-tool-name tool-name)
+                 (pi-format-tool-args tool-name args))
+               (let ((result-section (pi-new-section "result" 'tool-execution call-section)))
+                 (pi-insert-section result-section)
+                 (puthash tool-call-id
+                          (make-pi-tool-call
+                           :call-section call-section
+                           :result-section result-section
+                           :prev-text ""
+                           :tool-name tool-name
+                           :args args)
+                          pi-tool-calls))))))))))
+
 
 (defun pi-handle-message-end (event)
   (let* ((message (plist-get event :message))
@@ -778,49 +809,57 @@ PRED is called with KEY VALUE."
                        ((null limit) (format ":%d" start-line))
                        (t (let ((end-line (+ start-line limit -1)))
                             (format ":%d-%d" start-line end-line))))))
-         (pi-insert-file-link (expand-file-name path (pi-project-root)) suffix)
-         (insert "\n"))))
+         (pi-insert-file-link (expand-file-name path (pi-project-root)) suffix))))
     ("write"
      (when-let ((path (plist-get args :path))
                 (content (plist-get args :content)))
        (pi-insert-file-link (expand-file-name path (pi-project-root)))
        (when (not (string-empty-p content))
          (insert "\n")
-         (insert (pi-render-content path content)))
-       (insert "\n")))
+         (insert (pi-render-content path content)))))
     ("edit"
      (when-let ((path (plist-get args :path)))
-       (pi-insert-file-link (expand-file-name path (pi-project-root)))
-       (insert "\n")))
+       (pi-insert-file-link (expand-file-name path (pi-project-root)))))
     ("bash"
      (when-let ((command (plist-get args :command)))
-       (insert (format "%s\n" command))))
+       (insert (format "%s" command))))
     (_
-     (insert (format "%S\n" args)))))
+     (unless (null args)
+       (insert (format "%S" args))))))
 
-(defun pi-handle-tool-execution-start (event)
-  (let* ((tool-name (plist-get event :toolName))
-         (args (plist-get event :args)))
-    (when (string= tool-name "read")
-      (setq pi-current-tool-read-filename (plist-get args :path)))
-    (pi-widget-save-excursion
-      (setq pi-current-tool-section (pi-new-section tool-name 'tool pi-root-section))
-      (pi-insert-section pi-current-tool-section
-        (pi-insert-tool-name tool-name)
-        (pi-format-tool-args tool-name args)))))
+(defun pi-handle-tool-execution-update (event)
+  (let* ((tool-call-id (plist-get event :toolCallId))
+         (partial-result (plist-get event :partialResult))
+         (new-text (pi-content-text partial-result))
+         (entry (gethash tool-call-id pi-tool-calls)))
+    (when (and entry new-text)
+      (let ((prev-text (pi-tool-call-prev-text entry))
+            (result-section (pi-tool-call-result-section entry)))
+        (pi-widget-save-excursion
+          (if (string-prefix-p prev-text new-text)
+              (let ((diff (substring new-text (length prev-text))))
+                (unless (string-empty-p diff)
+                  (pi-append-section result-section
+                    (insert diff))))
+            (pi-replace-section result-section
+              (insert new-text)))
+          (setf (pi-tool-call-prev-text entry) new-text))))))
 
 (defun pi-handle-tool-execution-end (event)
-  (let* ((result (plist-get event :result))
+  (let* ((tool-call-id (plist-get event :toolCallId))
+         (result (plist-get event :result))
          (result-text (pi-content-text result))
          (is-error (plist-get event :isError))
-         (tool-name (plist-get event :toolName)))
-    (when pi-current-tool-section
-      (pi-widget-save-excursion
-        (pi-append-section pi-current-tool-section
-          (pi-insert-tool-result tool-name result-text is-error
-                                 (plist-get result :details)))))
-    (setq pi-current-tool-read-filename nil
-          pi-current-tool-section nil)))
+         (tool-name (plist-get event :toolName))
+         (entry (gethash tool-call-id pi-tool-calls)))
+    (when entry
+      (let ((result-section (pi-tool-call-result-section entry)))
+        (pi-widget-save-excursion
+          (pi-replace-section result-section
+            (pi-insert-tool-result tool-name result-text is-error
+                                   (plist-get result :details)
+                                   (pi-tool-call-args entry)))))
+      (remhash tool-call-id pi-tool-calls))))
 
 (defun pi-handle-auto-retry-start (event)
   (setq pi-retry-in-progress t)
@@ -854,12 +893,11 @@ PRED is called with KEY VALUE."
     (when has-content
       (pi-widget-save-excursion
         (pi-create-section "queue" 'queue pi-root-section
-          (insert (propertize "queue\n" 'face 'bold))
+          (insert (propertize "queue" 'face 'bold))
           (dolist (item steering)
-            (insert (propertize (format " Steering: %s\n" item) 'face 'pi-thinking-face)))
+            (insert (propertize (format "\n Steering: %s" item) 'face 'pi-thinking-face)))
           (dolist (item follow-up)
-            (insert (propertize (format " Follow-up: %s\n" item) 'face 'pi-thinking-face)))
-          (insert "\n"))))))
+            (insert (propertize (format "\n Follow-up: %s" item) 'face 'pi-thinking-face))))))))
 
 (defun pi-handle-compaction-end (event)
   (let* ((result (plist-get event :result))
@@ -883,7 +921,7 @@ PRED is called with KEY VALUE."
   (pi-set-event-listener "message_update" #'pi-handle-message-update)
   (pi-set-event-listener "message_end" #'pi-handle-message-end)
 
-  (pi-set-event-listener "tool_execution_start" #'pi-handle-tool-execution-start)
+  (pi-set-event-listener "tool_execution_update" #'pi-handle-tool-execution-update)
   (pi-set-event-listener "tool_execution_end" #'pi-handle-tool-execution-end)
 
   (pi-set-event-listener "auto_retry_start" #'pi-handle-auto-retry-start)
@@ -1312,9 +1350,8 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
   (dolist (child (copy-sequence (pi-section-children pi-root-section)))
     (pi-delete-section child))
   (setq pi-text-section nil
-        pi-thinking-section nil
-        pi-current-tool-section nil
-        pi-current-tool-read-filename nil))
+        pi-thinking-section nil)
+  (clrhash pi-tool-calls))
 
 (defun pi-refresh-session ()
   (interactive)
@@ -1501,6 +1538,7 @@ summarization."
 \\{pi-chat-mode-map}"
   (buffer-disable-undo)
   (setq header-line-format '(:eval (pi-format-header)))
+  (setq pi-tool-calls (make-hash-table :test 'equal))
   (pi-create-root-section)
   (setq pi-prompt-history (make-ring pi-prompt-history-max-size))
   (setq-local completion-at-point-functions
