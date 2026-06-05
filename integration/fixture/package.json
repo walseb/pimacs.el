@@ -1,0 +1,36 @@
+{
+  "name": "fixture",
+  "version": "1.0.0",
+  "description": "Record and Replay provider requests",
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "check": "tsc --noEmit",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "Anantha Kumaran <ananthakumaran@gmail.com>",
+  "license": "GPL-3.0-or-later",
+  "files": [
+    "src",
+    "README.md"
+  ],
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-agent-core": "*",
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.2",
+    "prettier": "3.8.3",
+    "typescript": "^6.0.3"
+  },
+  "dependencies": {
+    "proxay": "^1.9.0"
+  }
+}

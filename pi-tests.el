@@ -2,15 +2,12 @@
 
 ;;; Code:
 
-;; Test setuup:
+;; Test setup:
 
 (require 'ert)
 
 ;; development only packages, not declared as a package-dependency
 (package-initialize)
-
-(ert-deftest pi-hello-tests ()
-  (should (equal t t)))
 
 (require 'pi)
 

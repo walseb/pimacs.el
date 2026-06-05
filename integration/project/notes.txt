@@ -1,0 +1,4 @@
+Project notes:
+- Remember to update the config before deploying
+- The API endpoint is at /api/v1
+- Default timeout is 30 seconds

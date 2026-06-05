@@ -18,6 +18,10 @@ compile: cask
 test: compile
 	cask emacs --batch -L . -L test -l pi-tests.el -l pi-section-tests.el -f ert-run-tests-batch
 
+.PHONY: integration
+integration: compile
+	cask emacs --batch -L . -L test -l integration/pi-integration-tests.el -f ert-run-tests-batch
+
 .PHONY: format
 format:
 	cask emacs --batch -L . -l pi.el -l pi-section.el -l pi-tests.el -l pi-section-tests.el \
