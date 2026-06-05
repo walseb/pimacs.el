@@ -1,4 +1,4 @@
-;;; pi.el --- Emacs UI for Pi -*- lexical-binding: t -*-
+;;; pi.el --- Emacs Client for Pi -*- lexical-binding: t -*-
 
 ;; Copyright (C) 2026 Anantha Kumaran.
 
@@ -40,7 +40,7 @@
 (require 'timeout)
 
 (defgroup pi nil
-  "Emacs UI for Pi."
+  "Emacs client for Pi."
   :prefix "pi-"
   :group 'tools)
 
