@@ -20,6 +20,7 @@
   (should (equal (pi-parse-slash-command "/resume") '(pi-resume . nil)))
   (should (equal (pi-parse-slash-command "/compact") '(pi-compact . nil)))
   (should (equal (pi-parse-slash-command "/set-auto-compaction") '(pi-set-auto-compaction . nil)))
+  (should (equal (pi-parse-slash-command "/set-auto-retry") '(pi-set-auto-retry . nil)))
   (let ((err (should-error (pi-parse-slash-command "/set-auto-compaction true"))))
     (should (equal "Slash command \"/set-auto-compaction\" does not accept arguments" (error-message-string err))))
   (should (equal (pi-parse-slash-command "/compact custom instructions") '(pi-compact . "custom instructions")))

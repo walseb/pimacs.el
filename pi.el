@@ -164,6 +164,7 @@ when agent stops."
     ("resume" pi-resume 0)
     ("compact" pi-compact 1)
     ("set-auto-compaction" pi-set-auto-compaction 0)
+    ("set-auto-retry" pi-set-auto-retry 0)
     ("session" pi-session-stats 0)
     ("name" pi-set-session-name 1)
     ("set-thinking-level" pi-set-thinking-level 0)
@@ -1986,12 +1987,23 @@ summarization."
   (interactive (list (y-or-n-p "Enable auto compaction? ")))
   (pi-with-chat-buffer
     (pi-send-command
-     "set_auto_compaction" (list :enabled enabled)
+     "set_auto_compaction" (list :enabled (if enabled t 'json-false))
      (pi-on-response-success-callback resp
        (pi-update-header-line)
        (pi-widget-save-excursion
          (pi-create-section 'info pi-root-section
            (insert (format "Compaction set to: %s" (if enabled "auto" "manual")))))))))
+
+(defun pi-set-auto-retry (enabled)
+  (interactive (list (y-or-n-p "Enable auto retry? ")))
+  (pi-with-chat-buffer
+    (pi-send-command
+     "set_auto_retry" (list :enabled (if enabled t 'json-false))
+     (pi-on-response-success-callback resp
+       (pi-update-header-line)
+       (pi-widget-save-excursion
+         (pi-create-section 'info pi-root-section
+           (insert (format "Auto retry set to: %s" (if enabled "enabled" "disabled")))))))))
 
 (defun pi-bash (command &optional exclude-from-context)
   (interactive "sBash command: ")
