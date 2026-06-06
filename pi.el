@@ -387,6 +387,7 @@ PRED is called with KEY VALUE."
 (defvar pi-response-callbacks (make-hash-table :test 'equal))
 
 (pi-def-permanent-buffer-local pi-project-root nil)
+(pi-def-permanent-buffer-local pi-project-key nil)
 (pi-def-permanent-buffer-local pi-prompt-widget nil)
 (pi-def-permanent-buffer-local pi-prompt-before-widget nil)
 (pi-def-permanent-buffer-local pi-prompt-after-widget nil)
@@ -462,7 +463,7 @@ PRED is called with KEY VALUE."
   (file-name-nondirectory (directory-file-name (pi-project-root))))
 
 (defun pi-agent-buffer-name ()
-  (format "*pi-agent:%s*" (pi-project-name)))
+  (format "*pi-agent:%s*" (pi-project-key)))
 
 (defun pi-chat-buffer-name (&optional title)
   (if title
@@ -471,7 +472,9 @@ PRED is called with KEY VALUE."
 
 (defun pi-project-key ()
   "Unique key for the current project, used for internal hash tables."
-  (md5 (pi-project-root)))
+  (or
+   pi-project-key
+   (md5 (pi-project-root))))
 
 (defmacro pi-widget-save-excursion (&rest body)
   "Insert content before PROMPT-WIDGET and restore focus afterward."
@@ -620,7 +623,7 @@ PRED is called with KEY VALUE."
             (pop-to-buffer (current-buffer)))
           (error "Failed to run `%s' (exit code %d)" command-line exit-code))))))
 
-(defun pi-start-agent ()
+(defun pi-start-agent (key)
   (when (pi-current-agent)
     (error "Agent already exist"))
 
@@ -640,11 +643,12 @@ PRED is called with KEY VALUE."
       (set-process-sentinel process #'pi-net-sentinel)
       (set-process-query-on-exit-flag process nil)
       (with-current-buffer (process-buffer process)
-        (buffer-disable-undo))
-      (process-put process 'project-key (pi-project-key))
+        (buffer-disable-undo)
+        (setq-local pi-project-key key))
+      (process-put process 'project-key key)
       (process-put process 'project-root default-directory)
       (process-put process 'project-name (pi-project-name))
-      (puthash (pi-project-key) process pi-agents)
+      (puthash key process pi-agents)
       (message "(%s) pi agent started successfully." (pi-project-name)))))
 
 
@@ -1490,22 +1494,23 @@ PRED is called with KEY VALUE."
     (let ((slash (pi-parse-slash-command prompt))
           (bang (pi-parse-bang-command prompt))
           (double-bang (pi-parse-double-bang-command prompt)))
-      (cond
-       (slash
-        (let ((cmd (car slash))
-              (args (cdr slash)))
-          (if (null args)
-              (call-interactively cmd)
-            (apply cmd (list args))))
-        (pi-clear-prompt prompt))
-       (double-bang
-        (pi-bash double-bang t)
-        (pi-clear-prompt prompt))
-       (bang
-        (pi-bash bang)
-        (pi-clear-prompt prompt))
-       (t
-        (pi-with-chat-buffer
+      (pi-with-chat-buffer
+        (cond
+         (slash
+          (let ((cmd (car slash))
+                (args (cdr slash)))
+            (if (null args)
+                (call-interactively cmd)
+              (apply cmd (list args)))
+            (when (not (eq cmd 'pi-quit-chat))
+              (pi-clear-prompt prompt))))
+         (double-bang
+          (pi-bash double-bang t)
+          (pi-clear-prompt prompt))
+         (bang
+          (pi-bash bang)
+          (pi-clear-prompt prompt))
+         (t
           (pi-send-command
            "prompt" (list :message prompt
                           :streamingBehavior (when-let (behavior (or streaming-behavior pi-prompt-streaming-behavior))
@@ -2115,36 +2120,47 @@ summarization."
   (pi-fetch-commands))
 
 ;;;###autoload
-(defun pi-chat ()
+(defun pi-chat (&optional name)
   "Start a chat window"
-  (interactive)
-  (unless (pi-current-agent)
-    (pi-start-agent))
-  (let ((chat-buffer (or (pi-current-chat)
-                         (progn
-                           (let ((buffer (generate-new-buffer (pi-chat-buffer-name)))
-                                 (root (pi-project-root)))
-                             (with-current-buffer buffer
-                               (pi-chat-mode)
-                               (setq-local default-directory root))
-                             (puthash (pi-project-key) buffer pi-chats)
-                             buffer)))))
-    (pop-to-buffer chat-buffer)))
+  (interactive
+   (list (when current-prefix-arg
+           (read-string "Session name: "))))
+  (let* ((root (pi-project-root))
+         (key (if name
+                  (md5 (concat (pi-project-root) name))
+                (pi-project-key)))
+         (pi-project-key key))
+    (unless (pi-current-agent)
+      (pi-start-agent key))
+    (let ((chat-buffer (or (pi-current-chat)
+                           (progn
+                             (let ((buffer (generate-new-buffer (pi-chat-buffer-name name))))
+                               (with-current-buffer buffer
+                                 (setq-local pi-project-key key)
+                                 (puthash key buffer pi-chats)
+                                 (pi-chat-mode)
+                                 (setq-local default-directory root)
+                                 (when name
+                                   (pi-set-session-name name)))
+                               buffer)))))
+      (pop-to-buffer chat-buffer))))
 
 
 (defun pi-quit-chat ()
   "Quit the current chat window."
   (interactive)
   (when-let (buffer (pi-current-chat))
-    (kill-buffer buffer)))
+    (kill-buffer buffer))
+  (pi-kill-agent))
 
 (defun pi-restart-chat ()
   "Exit the current chat and restart"
   (interactive)
-  (when-let (buffer (pi-current-chat))
-    (kill-buffer buffer))
-  (pi-kill-agent)
-  (pi-chat))
+  (let ((root default-directory))
+    (pi-quit-chat)
+    (let ((default-directory root)
+          (pi-project-root root))
+      (pi-chat))))
 
 (provide 'pi)
 
