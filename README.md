@@ -25,22 +25,73 @@ pi
 
 ## Usage
 
-`M-x pi-chat` from your project folder, this starts the Pi Chat
-window. Enter your prompts to give instructions. To see the available
-slash commands, type `/` in the prompt. You can also run Bash commands
-using `!`, for example, `! echo 'hello'`. Use `!!` to execute the
-command without adding it to the context.
+Run `M-x pi-chat` from any file in your project to start a Pi chat
+session.
 
-## Sandbox
+The chat buffer is read-only except for the prompt input area. Use
+`RET` to submit a prompt and `C-j` to insert a newline. Press `i` from
+anywhere in the chat buffer to move point to the prompt input area.
 
-You can run Pi inside a sandbox by customizing `pi-executable` and `pi-flags`:
+### Slash Commands
+
+[Slash commands](https://pi.dev/docs/latest/usage#slash-commands) support completion in the prompt buffer. Type `/`
+and press `C-M-i` (or any key bound to completion) to see available
+commands.
+
+### Bash
+
+Prefix a command with `!` to run it in Bash. Use `!!` to run a command
+without adding it to the conversation context.
+
+```bash
+! echo "hello"
+```
+
+### Sandbox
+
+To run Pi inside a sandbox, customize `pi-executable` and `pi-flags`:
 
 ```elisp
 (setq pi-executable "nono")
 (setq pi-flags '("run" "--silent" "--profile" "pi" "--allow-cwd" "--" "pi" "--tools" "read,bash,edit,write,grep,find,ls"))
 ```
 
-### Custom Variables
+## How It Works
+
+Emacs starts [Pi](https://pi.dev/docs/latest/rpc) in RPC mode. In this setup, Pi handles the agent
+logic while Emacs provides the user interface.
+
+Some features, such as `/login` and `/logout`, are not [supported](https://github.com/earendil-works/pi/issues/885)
+because they are not currently exposed through the RPC API.
+
+## Keybindings
+
+### Chat Buffer Keybindings
+
+| Key          | Command                    | Description                               |
+|--------------|----------------------------|-------------------------------------------|
+| `C-g`        | `pi-abort`                 | Abort the current operation               |
+| `TAB`, `C-i` | `pi-toggle-section`        | Toggle visibility of the section at point |
+| `n`, `M-n`   | `pi-goto-next-section`     | Move to the next section                  |
+| `p`, `M-p`   | `pi-goto-previous-section` | Move to the previous section              |
+| `l`, `M-g l` | `pi-goto-last-section`     | Jump to the most recent section           |
+| `i`          | `pi-focus-prompt`          | Focus the prompt input field              |
+| `q`          | `pi-quit-chat`             | Quit the chat buffer                      |
+
+### Prompt Input Keybindings
+
+| Key     | Command                    | Description                                            |
+|---------|----------------------------|--------------------------------------------------------|
+| `C-g`   | `pi-abort`                 | Abort the current operation                            |
+| `M-p`   | `pi-previous-prompt`       | Recall the previous prompt from history                |
+| `M-n`   | `pi-next-prompt`           | Recall the next prompt from history                    |
+| `C-r`   | `pi-search-prompt`         | Search prompt history                                  |
+| `RET`   | `widget-field-activate`    | Send the current prompt                                |
+| `M-RET` | `pi-send-prompt-alternate` | Send the prompt using the alternate streaming behavior |
+| `M-g l` | `pi-goto-last-section`     | Jump to the most recent section                        |
+
+
+## Custom Variables
 
 #### pi-sync-request-timeout `2`
 
