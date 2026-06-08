@@ -61,17 +61,20 @@
            (write-region current-text nil tape-file nil 'silent))))
      (pi-quit-chat)))
 
+(defvar pi-settle-time (if (getenv "CI") 0.5 0.1))
+(defvar pi-poll-interval (if (getenv "CI") 0.5 0.05))
+
 (defun pi-drain-process-output (&optional timeout)
   (let* ((timeout (or timeout 30))
          (start (current-time))
          (buffer (pi-current-chat)))
-    (sleep-for 0.1)
+    (sleep-for pi-settle-time)
     (when buffer
       (with-current-buffer buffer
         (while (and pi-agent-state
                     (< (time-to-seconds (time-subtract (current-time) start)) timeout))
-          (accept-process-output nil 0.05))))
-    (sleep-for 0.1)))
+          (accept-process-output nil pi-poll-interval))))
+    (sleep-for pi-settle-time)))
 
 (defun pi-normalize-buffer-text (text)
   (replace-regexp-in-string (regexp-quote pi-project-directory) "PROJECT_DIR" text))
