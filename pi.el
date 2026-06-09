@@ -2015,6 +2015,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                (pi-send-command
                 "switch_session" (list :sessionPath session-path)
                 (pi-on-response-success-callback resp
+                  (pi-update-header-line)
                   (pi-unless-cancelled resp "Session switch"
                     (pi-refresh-session))))))))))))
 
@@ -2045,6 +2046,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
      (pi-on-response-success-callback resp
        (pi-unless-cancelled resp "Clone"
          (pi-refresh-session)
+         (pi-update-header-line)
          (pi-widget-save-excursion
            (pi-create-section 'info pi-root-section
              (insert "Session cloned."))))))))
@@ -2055,6 +2057,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
     (pi-send-command
      "new_session" '()
      (pi-on-response-success-callback resp
+       (pi-update-header-line)
        (pi-unless-cancelled resp "New session"
          (pi-widget-save-excursion
            (pi-clear-sections)))))))
@@ -2069,6 +2072,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
          "set_session_name" (list :name trimmed)
          (pi-on-response-success-callback resp
            (rename-buffer (pi-chat-buffer-name trimmed) t)
+           (pi-update-header-line)
            (pi-widget-save-excursion
              (pi-create-section 'info pi-root-section
                (insert (format "Session renamed to: %s" trimmed))))))))))
@@ -2085,6 +2089,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
       (pi-send-command
        "export_html" args
        (pi-on-response-success-callback resp
+         (pi-update-header-line)
          (let ((path (plist-get (plist-get resp :data) :path)))
            (pi-widget-save-excursion
              (pi-create-section 'info pi-root-section
@@ -2128,6 +2133,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                 (pi-unless-cancelled resp "Fork"
                   (let ((text (plist-get (plist-get resp :data) :text)))
                     (pi-refresh-session)
+                    (pi-update-header-line)
                     (pi-widget-save-excursion
                       (pi-create-section 'fork pi-root-section
                         (insert text))))))))))))))
@@ -2144,7 +2150,11 @@ summarization."
     (let ((args (if custom-instructions
                     (list :customInstructions custom-instructions)
                   '())))
-      (pi-send-command "compact" args))))
+      (pi-send-command
+       "compact"
+       args
+       (pi-on-response-success-callback resp
+         (pi-update-header-line))))))
 
 (defun pi-set-auto-compaction (enabled)
   (interactive (list (y-or-n-p "Enable auto compaction? ")))
@@ -2186,6 +2196,7 @@ summarization."
          "bash" args
          (lambda (resp)
            (pi-on-response-success resp
+             (pi-update-header-line)
              (let* ((data (plist-get resp :data))
                     (output (plist-get data :output)))
                (pi-widget-save-excursion
