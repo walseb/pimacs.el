@@ -28,11 +28,11 @@ Could you please provide more context? Are you asking about:
 
 Let me know how I can assist!
 
-bash ls
+bash ls -1 | LC_ALL=C sort
+README.md
 agent
 config.json
 notes.txt
-README.md
 utils.py
 
 

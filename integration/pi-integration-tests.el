@@ -182,7 +182,7 @@
     (pi-send-prompt-and-wait "/name sessionv1")
     (pi-send-prompt-and-wait "h1")
     (pi-send-prompt-and-wait "h2")
-    (pi-send-prompt-and-wait "!ls")
+    (pi-send-prompt-and-wait "!ls -1 | LC_ALL=C sort")
     (pi-send-prompt-and-wait "/new")
     (pi-send-prompt-and-wait "/name sessionv2")
     (pi-with-minibuffer-input (kbd "sessionv1 TAB RET")
