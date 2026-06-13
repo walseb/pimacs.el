@@ -410,11 +410,11 @@ PRED is called with KEY VALUE."
 
     (insert content)
 
-    (let ((delay-mode-hooks t)
-          (enable-local-variables nil)
-          (enable-local-eval nil))
-      (set-auto-mode)
-      (font-lock-ensure))
+    (delay-mode-hooks
+      (let ((enable-local-variables nil)
+            (enable-local-eval nil))
+        (set-auto-mode)
+        (font-lock-ensure)))
 
     ;; Prevent save prompts
     (set-buffer-modified-p nil)
@@ -425,7 +425,7 @@ PRED is called with KEY VALUE."
 (defun pi-render-diff (diff)
   (with-temp-buffer
     (insert diff)
-    (let ((delay-mode-hooks t))
+    (delay-mode-hooks
       (diff-mode)
       (font-lock-ensure))
     (set-buffer-modified-p nil)
