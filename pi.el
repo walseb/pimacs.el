@@ -260,6 +260,11 @@ with the message plist to insert the custom message content."
 
 (defvar-local pi-project-file-cache nil)
 
+(defun pi-clear-project-file-cache ()
+  "Clear the project file cache."
+  (interactive)
+  (setq pi-project-file-cache nil))
+
 (defun pi-maybe-log-rpc (type json)
   (when pi-log-rpc
     (write-region (concat "{\"type\": \"" type "\", \"message\": " json "}\n") nil pi-log-rpc-file t 'inhibit-message)))
@@ -1606,7 +1611,8 @@ PRED is called with KEY VALUE."
 (defun pi-handle-agent-state (event)
   (cl-case (intern (plist-get event :type))
     (agent_start (setq pi-agent-state 'thinking))
-    (agent_end (setq pi-agent-state nil))
+    (agent_end (setq pi-agent-state nil)
+               (pi-clear-project-file-cache))
     (turn_start (setq pi-agent-state 'thinking))
     (turn_end (setq pi-agent-state nil))
     (tool_execution_start (setq pi-agent-state (cons 'tool (plist-get event :toolName))))
