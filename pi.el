@@ -1558,7 +1558,8 @@ PRED is called with KEY VALUE."
     "Pi"))
 
 (defun pi-format-header ()
-  "Format the header line from `pi-header-line-state'."
+  "Format the header line from `pi-header-line-state'.
+Shows context usage and model info."
   (let* ((model (plist-get pi-header-line-state :model))
          (provider (plist-get model :provider))
          (model-id (plist-get model :id))
@@ -1570,13 +1571,9 @@ PRED is called with KEY VALUE."
          (ctx-window-usage (plist-get context-usage :contextWindow))
          (ctx-str (pi-format-number-short ctx-window-usage))
          (usage-str (pi-format-number-short ctx-tokens)))
-    (let* ((spinner-str (and pi-agent-state pi-spinner (spinner-print pi-spinner)))
-           (state-str (pi-format-state))
-           (suffix (if spinner-str (concat " " spinner-str) ""))
-           (left (format "%s/%s (%s) • %s%s"
+    (let* ((left (format "%s/%s (%s)"
                          usage-str ctx-str
-                         (if auto-compact "auto" "manual")
-                         state-str suffix))
+                         (if auto-compact "auto" "manual")))
            (right (format "(%s) %s • %s"
                           (or provider "?")
                           (or model-id "?")
@@ -1585,6 +1582,13 @@ PRED is called with KEY VALUE."
               left
               (make-string (max 1 (- (window-width) (length left) (length right))) ?\s)
               right))))
+
+(defun pi-format-mode-line ()
+  (let ((spinner-str (and pi-agent-state (spinner-print pi-spinner)))
+        (state-str (pi-format-state)))
+    (if spinner-str
+        (format " %s %s" state-str spinner-str)
+      (format " %s" state-str))))
 
 (defun pi-update-header-line ()
   (let* ((state-result nil)
@@ -1622,12 +1626,9 @@ PRED is called with KEY VALUE."
     (auto_retry_start (setq pi-agent-state 'retrying))
     (auto_retry_end (setq pi-agent-state nil)))
   (if pi-agent-state
-      (unless pi-spinner
-        (setq pi-spinner (spinner-create 'progress-bar))
+      (unless (spinner--active-p pi-spinner)
         (spinner-start pi-spinner))
-    (when pi-spinner
-      (spinner-stop pi-spinner)
-      (setq pi-spinner nil)))
+    (spinner-stop pi-spinner))
   (when (string-suffix-p "_end" (plist-get event :type))
     (pi-autohide-sections))
   (pi-update-header-line))
@@ -2367,6 +2368,7 @@ With a prefix argument, visit in other window."
               (append (list #'pi-completion-at-point-slash
                             #'pi-completion-at-point-file)
                       completion-at-point-functions))
+  (setq pi-spinner (spinner-create 'progress-bar))
   (setq pi-prompt-before-widget (widget-create 'pi-item :face 'pi-widget-face pi-empty-widget-text))
   (setq pi-prompt-widget
         (widget-create 'editable-field
@@ -2384,6 +2386,9 @@ With a prefix argument, visit in other window."
   (pi-focus-prompt)
   (add-hook 'kill-buffer-hook 'pi-cleanup-chat-buffer nil t)
   (pi-register-event-listeners)
+  (setq-local mode-line-misc-info
+              (append (list '(:eval (pi-format-mode-line)))
+                      mode-line-misc-info))
   (pi-update-header-line)
   (pi-fetch-commands))
 

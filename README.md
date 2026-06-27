@@ -41,6 +41,12 @@ region to the prompt input.
 and press `C-M-i` (or any key bound to completion) to see available
 commands.
 
+### File Name Completion
+
+Type `@` followed by a partial file path to trigger file name
+completion in the prompt buffer. The completion backend is controlled
+by `pi-file-completion-backend`.
+
 ### Bash
 
 Prefix a command with `!` to run it in Bash. Use `!!` to run a command
