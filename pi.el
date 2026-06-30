@@ -1780,6 +1780,7 @@ If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
 (declare-function flycheck-error-message "ext:flycheck")
 (declare-function flycheck-error-buffer "ext:flycheck")
 (declare-function flycheck-error-format-position "ext:flycheck")
+(defvar flycheck-current-errors)
 
 (defun pi-get-line-contents (buffer line)
   (with-current-buffer buffer
@@ -1795,7 +1796,8 @@ If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
 (defun pi-send-flycheck-errors ()
   "Append flycheck errors at point to the pi prompt input."
   (interactive)
-  (let ((errors (flycheck-overlay-errors-at (point))))
+  (let ((errors (or (flycheck-overlay-errors-at (point))
+                    flycheck-current-errors)))
     (when (and errors buffer-file-name)
       (let* ((relative (pi-project-relative-name))
              (error-lines
