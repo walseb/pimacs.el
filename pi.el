@@ -5,7 +5,7 @@
 ;; Author: Anantha kumaran <ananthakumaran@gmail.com>
 ;; URL: http://github.com/ananthakumaran/pi.el
 ;; Version: 0.1
-;; Keywords: pi agent
+;; Keywords: convenience processes
 ;; Package-Requires: ((emacs "28.1") (compat "31.0") (markdown-mode "2.8") (timeout "2.1.7") (pcre2el "1.12") (spinner "1.7"))
 
 ;; This program is free software: you can redistribute it and/or modify it
@@ -25,6 +25,8 @@
 ;; This file is not part of GNU Emacs.
 
 ;;; Commentary:
+
+;; pi.el provides an Emacs client for interacting with Pi, an AI coding agent.
 
 ;;; Code:
 

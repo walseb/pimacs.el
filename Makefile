@@ -16,6 +16,13 @@ compile: cask
 	  -f batch-byte-compile pi.el pi-section.el pi-edit.el; \
 	  (ret=$$? ; cask clean-elc && exit $$ret)
 
+.PHONY: package-lint
+package-lint: cask
+	cask emacs -Q --batch \
+	  --eval "(setq package-lint-main-file \"pi.el\")" \
+	  -f package-lint-batch-and-exit \
+	  pi.el pi-section.el pi-edit.el
+
 .PHONY: test
 test: compile
 	cask emacs --batch -L . -L test -l pi-tests.el -l pi-section-tests.el -eval '(ert-run-tests-batch-and-exit "$(MATCH)")'

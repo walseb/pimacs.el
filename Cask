@@ -7,4 +7,5 @@
 (package-file "pi.el")
 
 (development
- (depends-on "undercover"))
+ (depends-on "undercover")
+ (depends-on "package-lint"))
