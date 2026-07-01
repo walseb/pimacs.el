@@ -104,6 +104,9 @@
   "Face used for extension status."
   :group 'pi)
 
+(defvar pi--minimum-version "0.79.9"
+  "The minimum supported Pi agent version.")
+
 (defcustom pi-use-ansi-colors t
   "Whether to render ANSI colors in widget and status output."
   :type 'boolean
@@ -712,12 +715,19 @@ PRED is called with KEY VALUE."
             (pop-to-buffer (current-buffer)))
           (error "Failed to run `%s' (exit code %d)" command-line exit-code))))))
 
+(defun pi--check-agent-version (version)
+  (unless (version-list-<= (version-to-list pi--minimum-version)
+                           (version-to-list version))
+    (error "Pi agent version %s is older than minimum supported version %s"
+           version pi--minimum-version)))
+
 (defun pi--start-agent (key)
   (when (pi--current-agent)
     (error "Agent already exist"))
 
   (let* ((default-directory (pi--project-root))
          (version (pi--agent-version)))
+    (pi--check-agent-version version)
     (message "(%s) Starting pi version %s..." (pi--project-name) version)
     (let* ((process-environment (append pi-process-environment process-environment))
            (buf (generate-new-buffer (pi--agent-buffer-name)))
