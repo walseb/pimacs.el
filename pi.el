@@ -2644,16 +2644,23 @@ MESSAGE is shown as a notification when complete."
      "get_state" '()
      (pi--on-response-success-callback resp
        (let* ((data (plist-get resp :data))
-              (session-file (plist-get data :sessionFile)))
-         (pi--kill-agent t)
-         (pi--widget-save-excursion
-           (pi--clear-sections))
-         (pi--start-agent (pi--project-key))
-         (pi--switch-session
-          session-file
-          "Agent reloaded."
+              (session-file (plist-get data :sessionFile))
+              (project-key (pi--project-key))
+              (chat-buffer (current-buffer)))
+         (run-at-time
+          0 nil
           (lambda ()
-            (pi--fetch-commands))))))))
+            (when (buffer-live-p chat-buffer)
+              (with-current-buffer chat-buffer
+                (pi--kill-agent t)
+                (pi--widget-save-excursion
+                  (pi--clear-sections))
+                (pi--start-agent project-key)
+                (pi--switch-session
+                 session-file
+                 "Agent reloaded."
+                 (lambda ()
+                   (pi--fetch-commands))))))))))))
 
 (defun pi-restart-chat ()
   "Exit the current chat and restart."
