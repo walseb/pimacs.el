@@ -370,6 +370,10 @@ with the message plist to insert the custom message content."
   "Return the name of KEYWORD as a string without the leading colon."
   (substring (symbol-name keyword) 1))
 
+(defun pi--current-column-1-based ()
+  "Return the current column as a 1-based number."
+  (1+ (current-column)))
+
 (defun pi--seconds-elapsed-since (time)
   (time-to-seconds (time-subtract (current-time) time)))
 
@@ -1092,9 +1096,11 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
 
 (defun pi--visit-read-result (_details args)
   (when-let ((path (plist-get args :path)))
-    (let ((file (expand-file-name path (pi--project-root)))
-          (line (+ (or (plist-get args :offset) 1) (pi-section--section-line))))
-      (list :file file :line line))))
+    (let* ((section-line (pi-section--section-line))
+           (file (expand-file-name path (pi--project-root)))
+           (line (+ (or (plist-get args :offset) 1) section-line))
+           (column (pi--current-column-1-based)))
+      (list :file file :line line :column column))))
 
 (defun pi--visit-read-call (args)
   (when-let ((path (plist-get args :path)))
@@ -1120,8 +1126,12 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
 
 (defun pi--visit-write-call (args)
   (when-let ((path (plist-get args :path)))
-    (list :file (expand-file-name path (pi--project-root))
-          :line (max 1 (pi-section--section-line)))))
+    (let ((section-line (pi-section--section-line)))
+      (list :file (expand-file-name path (pi--project-root))
+            :line (max 1 section-line)
+            :column (if (zerop section-line)
+                        1
+                      (pi--current-column-1-based))))))
 
 ;; edit
 (defun pi--insert-edit-args (args)
@@ -1142,7 +1152,7 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
   (when-let ((path (plist-get args :path)))
     (let* ((section (pi-section--current-section))
            (reverse (not (save-excursion (beginning-of-line) (looking-at "[-<]"))))
-           (line-number
+           (location
             (save-restriction
               (narrow-to-region (pi-section-beginning section)
                                 (pi-section-end section))
@@ -1150,10 +1160,15 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
                   (pcase-let ((`(,buffer ,_line-offset ,pos ,src ,_dst ,_switched)
                                (diff-find-source-location nil reverse)))
                     (with-current-buffer buffer
-                      (line-number-at-pos (+ (car pos) (cdr src)))))
+                      (let ((visit-pos (+ (car pos) (cdr src))))
+                        (save-excursion
+                          (goto-char visit-pos)
+                          (list :line (line-number-at-pos)
+                                :column (pi--current-column-1-based))))))
                 (error nil)))))
       (list :file (expand-file-name path (pi--project-root))
-            :line (or line-number 1)))))
+            :line (or (plist-get location :line) 1)
+            :column (plist-get location :column)))))
 
 ;; bash
 (defun pi--insert-bash-args (args)
@@ -1213,7 +1228,7 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
                text)))))
 
 (defconst pi--grep-line-regexp "^\\(.*\\):\\([0-9]+\\): \\(.*\\)$")
-(defconst pi--grep-line-alt-regexp "^\\(.*\\)\\([-:]\\)\\([0-9]+\\)\\([-:]\\)\\(.*\\)$")
+(defconst pi--grep-line-alt-regexp "^\\(.*\\)\\([-:]\\)\\([0-9]+\\)\\([-:] ?\\)\\(.*\\)$")
 
 (defun pi--insert-grep-result (result-text _details args)
   (if (string-empty-p result-text)
@@ -1249,17 +1264,23 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
         path)
     file))
 
+(defun pi--visit-grep-match (args cursor-column file-group line-group content-group)
+  (let ((content-column (save-excursion
+                          (goto-char (match-beginning content-group))
+                          (current-column))))
+    (list :file (pi--normalize-grep-file (match-string file-group) args)
+          :line (string-to-number (match-string line-group))
+          :column (max 1 (1+ (- cursor-column content-column))))))
+
 (defun pi--visit-grep-result (_details args)
-  (save-excursion
-    (beginning-of-line)
-    (when-let ((line (thing-at-point 'line t)))
+  (let ((cursor-column (current-column)))
+    (save-excursion
+      (beginning-of-line)
       (cond
-       ((string-match pi--grep-line-regexp line)
-        (list :file (pi--normalize-grep-file (match-string 1 line) args)
-              :line (string-to-number (match-string 2 line))))
-       ((string-match pi--grep-line-alt-regexp line)
-        (list :file (pi--normalize-grep-file (match-string 1 line) args)
-              :line (string-to-number (match-string 3 line))))))))
+       ((looking-at pi--grep-line-regexp)
+        (pi--visit-grep-match args cursor-column 1 2 3))
+       ((looking-at pi--grep-line-alt-regexp)
+        (pi--visit-grep-match args cursor-column 1 3 5))))))
 
 ;; find
 (defun pi--insert-find-args (args)
@@ -2432,12 +2453,15 @@ summarization."
 (defun pi--visit-file (result &optional other-window)
   (let ((file (plist-get result :file))
         (line (plist-get result :line))
+        (column (plist-get result :column))
         (find-file-func (if other-window #'find-file-other-window #'find-file)))
     (when file
       (funcall find-file-func file)
       (when line
         (goto-char (point-min))
-        (forward-line (1- line))))))
+        (forward-line (1- line)))
+      (when column
+        (move-to-column (max 0 (1- column)))))))
 
 (defun pi--visit-file-at-point (other-window)
   (when-let (file (pi--file-at-point))
@@ -2466,6 +2490,11 @@ With a prefix argument OTHER-WINDOW, visit in other window."
     (t
      (pi--visit-file-at-point other-window))))
 
+(defun pi-visit-item-other-window ()
+  "Visit current item in other window."
+  (interactive)
+  (pi-visit-item t))
+
 (defun pi-goto-next-user-message ()
   "Go to the next user message."
   (interactive)
@@ -2483,6 +2512,7 @@ With a prefix argument OTHER-WINDOW, visit in other window."
   :parent special-mode-map
   "<remap> <keyboard-quit>" #'pi-abort
   "RET" #'pi-visit-item
+  "M-RET" #'pi-visit-item-other-window
   "TAB" #'pi-toggle-section
   "C-i" #'pi-toggle-section
   "n" #'pi-goto-next-section

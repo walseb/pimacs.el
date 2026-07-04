@@ -558,7 +558,8 @@ Does not recurse into the parent."
 Returns 0 if point is on the first line of the section or if there is
 no current section."
   (if-let ((section (pi-section--current-section)))
-      (count-lines (pi-section-beginning section) (point))
+      (- (line-number-at-pos (point))
+         (line-number-at-pos (pi-section-beginning section)))
     0))
 
 (provide 'pi-section)
