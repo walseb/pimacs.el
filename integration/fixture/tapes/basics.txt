@@ -290,5 +290,5 @@ assistant> File `test.txt` has been deleted successfully.
 
 Session exported to: /tmp/pi-session.html
 
-​user> 
-​​
+ user> 
+  

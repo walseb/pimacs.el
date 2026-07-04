@@ -297,7 +297,7 @@ with the message plist to insert the custom message content."
 
 ;;; Widget
 
-(defconst pi--empty-widget-text "\u200B")
+(defconst pi--empty-widget-text (propertize " " 'invisible t))
 
 (defun pi--widget-item-value-create (widget)
   (let ((value (widget-get widget :value)))

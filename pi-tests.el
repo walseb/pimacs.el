@@ -101,5 +101,53 @@
   (should (equal (pi--join '(("k1" . "v1") ("k2" . "v2"))) "v1\nv2"))
   (should (equal (pi--join '(("k1" . "a\nb") ("k2" . "c"))) "a\nb\nc")))
 
+(ert-deftest pi-clear-ui-keeps-sections-before-prompt-widgets ()
+  (with-temp-buffer
+    (pi-section--create-root-section)
+    (setq pi--tool-calls (make-hash-table :test 'equal))
+    (setq pi--prompt-before-widget
+          (widget-create 'pi-item :face 'pi-widget-face pi--empty-widget-text))
+    (setq pi--prompt-widget
+          (widget-create 'editable-field :format "%[user>%] %v" :value ""))
+    (setq pi--prompt-after-widget
+          (widget-create 'pi-item :face 'pi-widget-face pi--empty-widget-text))
+    (setq pi--prompt-widget-lines (make-hash-table :test 'equal))
+    (setq pi--status-widget
+          (widget-create 'pi-item :face 'pi-status-face pi--empty-widget-text))
+    (setq pi--status-widget-lines (make-hash-table :test 'equal))
+    (widget-setup)
+
+    (cl-labels ((insert-section ()
+                  (let (section)
+                    (pi--widget-save-excursion
+                      (setq section
+                            (pi-section--create-section 'info pi-section--root-section
+                              (insert "sections"))))
+                    section))
+                (set-widgets ()
+                  (pi--handle-set-widget '(:widgetKey "before"
+                                                      :widgetLines ("before-widget")
+                                                      :widgetPlacement "aboveEditor"))
+                  (pi--handle-set-widget '(:widgetKey "after"
+                                                      :widgetLines ("after-widget")
+                                                      :widgetPlacement "belowEditor"))))
+      (set-widgets)
+      (let ((section (insert-section)))
+        (should (< (marker-position (pi-section-beginning section))
+                   (marker-position (widget-get pi--prompt-before-widget :from))
+                   (marker-position (widget-get pi--prompt-widget :from))
+                   (marker-position (widget-get pi--prompt-after-widget :from)))))
+
+      (pi--widget-save-excursion
+        (pi--clear-sections)
+        (pi--clear-session-widgets))
+
+      (set-widgets)
+      (let ((section (insert-section)))
+        (should (< (marker-position (pi-section-beginning section))
+                   (marker-position (widget-get pi--prompt-before-widget :from))
+                   (marker-position (widget-get pi--prompt-widget :from))
+                   (marker-position (widget-get pi--prompt-after-widget :from))))))))
+
 ;;; pi-tests.el ends here
 

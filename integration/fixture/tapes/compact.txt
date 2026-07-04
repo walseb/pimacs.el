@@ -247,5 +247,5 @@ Inline code is written as `` `inline` ``! Here's another one with variables like
 
 **Final Thoughts:** 🌟 **Bold!** *Italic* `code` > blockquotes | tables ✅ checkboxes ✨ code blocks - all supported! Try these out in your editor or renderer to see markdown magic happening before you 👆 💡
 
-​user> 
-​​
+ user> 
+  

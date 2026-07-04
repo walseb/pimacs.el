@@ -201,7 +201,7 @@ is a sublist of LIST (as if '* matched zero or more arbitrary elements of LIST)"
     (when parent
       (setf (pi-section-children parent)
             (delq section (pi-section-children parent)))
-      (pi-section--update-section-end parent beg))))
+      (pi-section--update-section-end parent (copy-marker beg)))))
 
 (defmacro pi-section--create-or-replace-section (section type parent &rest body)
   (declare (indent 3)

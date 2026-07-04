@@ -505,6 +505,30 @@
       (should (not (search-forward "Connected client" nil t)))
       (should (not (search-forward "Job" nil t))))))
 
+(ert-deftest pi-section-delete-all-restores-empty-root-bounds ()
+  (pi-with-root-section
+    (let* ((initial-root-beginning (pi-section-beginning pi-section--root-section))
+           (initial-root-end (marker-position (pi-section-end pi-section--root-section)))
+           (build (pi-section--new-section 'build pi-section--root-section))
+           (compile (pi-section--new-section 'compile build))
+           (logs (pi-section--new-section 'logs pi-section--root-section)))
+      (pi-section--insert-section build
+        (insert "[-] Build\n"))
+      (pi-section--insert-section compile
+        (insert "  [-] Compile\n")
+        (insert "      Compiling foo.c\n"))
+      (pi-section--insert-section logs
+        (insert "[-] Logs\n")
+        (insert "  Listening on :8080\n"))
+      (pi-section--delete-section build)
+      (pi-section--delete-section logs)
+      (should (= (pi-section-beginning pi-section--root-section)
+                 initial-root-beginning))
+      (should (= (marker-position (pi-section-end pi-section--root-section))
+                 initial-root-end))
+      (should (null (pi-section-children pi-section--root-section)))
+      (should (equal (buffer-string) "")))))
+
 
 ;; ─── pi-section--update-section-end ─────────────────────────────────────────────
 
