@@ -205,9 +205,15 @@ in another window
 @item @kbd{n}, @kbd{M-n}
 @tab @code{pi-goto-next-section}
 @tab Move to the next section
+@item @kbd{N}
+@tab @code{pi-goto-next-user-message}
+@tab Move to the next user message
 @item @kbd{p}, @kbd{M-p}
 @tab @code{pi-goto-previous-section}
 @tab Move to the previous section
+@item @kbd{P}
+@tab @code{pi-goto-previous-user-message}
+@tab Move to the previous user message
 @item @kbd{l}, @kbd{M-g l}
 @tab @code{pi-goto-last-section}
 @tab Jump to the most recent section
@@ -266,12 +272,12 @@ The number of seconds to wait for a sync response.
 Pi command executable name.
 @end defopt
 
-@defopt pi-process-environment @code{nil}
+@defopt pi-process-environment @code{'()}
 
 List of extra environment variables to use when starting pi.
 @end defopt
 
-@defopt pi-flags @code{nil}
+@defopt pi-flags @code{'()}
 
 List of additional flags to provide when starting pi.
 @end defopt
@@ -281,12 +287,12 @@ List of additional flags to provide when starting pi.
 When non-nil, log all RPC JSON to @code{pi-log-rpc-file}.
 @end defopt
 
-@defopt pi-log-rpc-file @code{"/tmp/pi.el.log"}
+@defopt pi-log-rpc-file @code{(expand-file-name "pi.el.log" (temporary-file-directory))}
 
 File to write RPC JSON log entries to.
 @end defopt
 
-@defopt pi-file-completion-backend @code{project}
+@defopt pi-file-completion-backend @code{'project}
 
 Completion backend for @-prefixed file paths in prompts.
 @code{project} uses @code{project-files} to list files in the current project.
@@ -303,7 +309,7 @@ Maximum number of prompt history entries to keep.
 Maximum number of recent sessions to list when resuming a session.
 @end defopt
 
-@defopt pi-prompt-streaming-behavior @code{followUp}
+@defopt pi-prompt-streaming-behavior @code{'followUp}
 
 Default streaming behavior for prompts.
 
@@ -318,19 +324,26 @@ when agent stops.
 @defopt pi-slash-commands
 
 @lisp
-(("model" pi-select-model 0) ("new" pi-new-session 0)
- ("reload" pi-reload 0) ("resume" pi-resume 0)
- ("compact" pi-compact 1)
- ("set-auto-compaction" pi-set-auto-compaction 0)
- ("set-auto-retry" pi-set-auto-retry 0) ("session" pi-session-stats 0)
- ("name" pi-set-session-name 1)
- ("set-thinking-level" pi-set-thinking-level 0)
- ("cycle-model" pi-cycle-model 0)
- ("cycle-thinking-level" pi-cycle-thinking-level 0)
- ("set-steering-mode" pi-set-steering-mode 0)
- ("set-follow-up-mode" pi-set-follow-up-mode 0) ("fork" pi-fork 0)
- ("clone" pi-clone 0) ("copy" pi-copy 0) ("export" pi-export 1)
- ("quit" pi-quit-chat 0) ("exit" pi-quit-chat 0))
+'(("model" pi-select-model 0)
+  ("new" pi-new-session 0)
+  ("reload" pi-reload 0)
+  ("resume" pi-resume 0)
+  ("compact" pi-compact 1)
+  ("set-auto-compaction" pi-set-auto-compaction 0)
+  ("set-auto-retry" pi-set-auto-retry 0)
+  ("session" pi-session-stats 0)
+  ("name" pi-set-session-name 1)
+  ("set-thinking-level" pi-set-thinking-level 0)
+  ("cycle-model" pi-cycle-model 0)
+  ("cycle-thinking-level" pi-cycle-thinking-level 0)
+  ("set-steering-mode" pi-set-steering-mode 0)
+  ("set-follow-up-mode" pi-set-follow-up-mode 0)
+  ("fork" pi-fork 0)
+  ("clone" pi-clone 0)
+  ("copy" pi-copy 0)
+  ("export" pi-export 1)
+  ("quit" pi-quit-chat 0)
+  ("exit" pi-quit-chat 0))
 @end lisp
 
 Alist mapping slash command names to command specs.
@@ -344,10 +357,13 @@ arguments the command accepts.
 @defopt pi-insert-tool-args-functions
 
 @lisp
-(("read" . pi--insert-read-args) ("write" . pi--insert-write-args)
- ("edit" . pi--insert-edit-args) ("bash" . pi--insert-bash-args)
- ("grep" . pi--insert-grep-args) ("find" . pi--insert-find-args)
- ("ls" . pi--insert-ls-args))
+'(("read" . pi--insert-read-args)
+  ("write" . pi--insert-write-args)
+  ("edit" . pi--insert-edit-args)
+  ("bash" . pi--insert-bash-args)
+  ("grep" . pi--insert-grep-args)
+  ("find" . pi--insert-find-args)
+  ("ls" . pi--insert-ls-args))
 @end lisp
 
 Alist mapping tool names to inserter functions.
@@ -359,10 +375,13 @@ with ARGS plist to insert formatted tool call arguments.
 @defopt pi-insert-tool-result-functions
 
 @lisp
-(("bash" . pi--insert-bash-result) ("read" . pi--insert-read-result)
- ("write" . pi--insert-write-result) ("edit" . pi--insert-edit-result)
- ("grep" . pi--insert-grep-result) ("find" . pi--insert-find-result)
- ("ls" . pi--insert-ls-result))
+'(("bash" . pi--insert-bash-result)
+  ("read" . pi--insert-read-result)
+  ("write" . pi--insert-write-result)
+  ("edit" . pi--insert-edit-result)
+  ("grep" . pi--insert-grep-result)
+  ("find" . pi--insert-find-result)
+  ("ls" . pi--insert-ls-result))
 @end lisp
 
 Alist mapping tool names to result inserter functions.
@@ -374,8 +393,10 @@ with (RESULT-TEXT DETAILS ARGS) to insert the tool execution result.
 @defopt pi-visit-tool-result-functions
 
 @lisp
-(("read" . pi--visit-read-result) ("write" . pi--visit-write-result)
- ("edit" . pi--visit-edit-result) ("grep" . pi--visit-grep-result))
+'(("read" . pi--visit-read-result)
+  ("write" . pi--visit-write-result)
+  ("edit" . pi--visit-edit-result)
+  ("grep" . pi--visit-grep-result))
 @end lisp
 
 Alist mapping tool names to result visitor functions.
@@ -387,8 +408,9 @@ with (DETAILS ARGS) to visit the relevant location of the tool result.
 @defopt pi-visit-tool-call-functions
 
 @lisp
-(("read" . pi--visit-read-call) ("write" . pi--visit-write-call)
- ("edit" . pi--visit-edit-call))
+'(("read" . pi--visit-read-call)
+  ("write" . pi--visit-write-call)
+  ("edit" . pi--visit-edit-call))
 @end lisp
 
 Alist mapping tool names to call visitor functions.
@@ -397,7 +419,7 @@ Each entry is (TOOL-NAME . FUNCTION) where FUNCTION is called
 with (ARGS) to visit the relevant location of the tool call.
 @end defopt
 
-@defopt pi-insert-custom-message-functions @code{nil}
+@defopt pi-insert-custom-message-functions @code{'()}
 
 Alist mapping custom message types to inserter functions.
 

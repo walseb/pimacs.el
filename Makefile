@@ -10,6 +10,11 @@ $(CASK_DIR): Cask
 .PHONY: cask
 cask: $(CASK_DIR)
 
+.PHONY: setup
+setup: cask
+	npm install -g --ignore-scripts @earendil-works/pi-coding-agent
+	cd integration/fixture && npm install
+
 .PHONY: compile
 compile: cask
 	cask emacs -batch -L . -L test \
@@ -62,21 +67,38 @@ sandbox:
 
 define ESCRIPT
 (with-temp-buffer
-  (require 'pp)
   (require 'subr-x)
   (insert-file-contents "pi-section.el")
   (insert-file-contents "pi.el")
   (while
       (ignore-errors
-        (let ((sexp (read (current-buffer))))
+        (let ((form-start (point))
+              (sexp (read (current-buffer))))
           (when sexp
             (when (eq (car sexp) 'defcustom)
               (unless (cadr (cddr sexp))
                 (princ (format "Documentation missing for defcustom %S\n" (cadr sexp)))
                 (kill-emacs 1))
               (let* ((name (cadr sexp))
-                     (default-raw (pp-to-string (eval (car (cddr sexp)) t)))
-                     (default-str (string-trim default-raw))
+                     (default-raw
+                      (save-excursion
+                        (goto-char form-start)
+                        (forward-comment (point-max))
+                        (forward-char 1)
+                        (forward-sexp 1)
+                        (forward-comment (point-max))
+                        (forward-sexp 1)
+                        (forward-comment (point-max))
+                        (let ((default-start (point)))
+                          (forward-sexp 1)
+                          (buffer-substring-no-properties default-start (point)))))
+                     (default-str
+                      (with-temp-buffer
+                        (emacs-lisp-mode)
+                        (insert default-raw)
+                        (let ((inhibit-message t))
+                          (indent-region (point-min) (point-max)))
+                        (string-trim (buffer-string))))
                      (doc (replace-regexp-in-string "`\\([^']*\\)'" "@code{\\1}" (cadr (cddr sexp)))))
                 (if (string-match-p "\n" default-str)
                     (princ (format "@defopt %s\n\n@lisp\n%s\n@end lisp\n\n%s\n@end defopt\n\n" name default-str doc))

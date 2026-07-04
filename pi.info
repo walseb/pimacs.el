@@ -187,7 +187,9 @@ Key            Command                Description
 ‘TAB’, ‘C-i’   ‘pi-toggle-section’    Toggle visibility of the section
                                       at point
 ‘n’, ‘M-n’     ‘pi-goto-next-section’ Move to the next section
+‘N’            ‘pi-goto-next-user-message’Move to the next user message
 ‘p’, ‘M-p’     ‘pi-goto-previous-section’Move to the previous section
+‘P’            ‘pi-goto-previous-user-message’Move to the previous user message
 ‘l’, ‘M-g l’   ‘pi-goto-last-section’ Jump to the most recent section
 ‘i’            ‘pi-focus-prompt’      Focus the prompt input field
 ‘q’            ‘pi-quit-chat’         Quit the chat buffer
@@ -226,11 +228,11 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      Pi command executable name.
 
- -- User Option: pi-process-environment nil
+ -- User Option: pi-process-environment '()
 
      List of extra environment variables to use when starting pi.
 
- -- User Option: pi-flags nil
+ -- User Option: pi-flags '()
 
      List of additional flags to provide when starting pi.
 
@@ -238,11 +240,12 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      When non-nil, log all RPC JSON to ‘pi-log-rpc-file’.
 
- -- User Option: pi-log-rpc-file "/tmp/pi.el.log"
+ -- User Option: pi-log-rpc-file (expand-file-name "pi.el.log"
+          (temporary-file-directory))
 
      File to write RPC JSON log entries to.
 
- -- User Option: pi-file-completion-backend project
+ -- User Option: pi-file-completion-backend 'project
 
      Completion backend for prefixed file paths in prompts.  ‘project’
      uses ‘project-files’ to list files in the current project.  ‘file’
@@ -257,7 +260,7 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      Maximum number of recent sessions to list when resuming a session.
 
- -- User Option: pi-prompt-streaming-behavior followUp
+ -- User Option: pi-prompt-streaming-behavior 'followUp
 
      Default streaming behavior for prompts.
 
@@ -270,19 +273,26 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
  -- User Option: pi-slash-commands
 
-          (("model" pi-select-model 0) ("new" pi-new-session 0)
-           ("reload" pi-reload 0) ("resume" pi-resume 0)
-           ("compact" pi-compact 1)
-           ("set-auto-compaction" pi-set-auto-compaction 0)
-           ("set-auto-retry" pi-set-auto-retry 0) ("session" pi-session-stats 0)
-           ("name" pi-set-session-name 1)
-           ("set-thinking-level" pi-set-thinking-level 0)
-           ("cycle-model" pi-cycle-model 0)
-           ("cycle-thinking-level" pi-cycle-thinking-level 0)
-           ("set-steering-mode" pi-set-steering-mode 0)
-           ("set-follow-up-mode" pi-set-follow-up-mode 0) ("fork" pi-fork 0)
-           ("clone" pi-clone 0) ("copy" pi-copy 0) ("export" pi-export 1)
-           ("quit" pi-quit-chat 0) ("exit" pi-quit-chat 0))
+          '(("model" pi-select-model 0)
+            ("new" pi-new-session 0)
+            ("reload" pi-reload 0)
+            ("resume" pi-resume 0)
+            ("compact" pi-compact 1)
+            ("set-auto-compaction" pi-set-auto-compaction 0)
+            ("set-auto-retry" pi-set-auto-retry 0)
+            ("session" pi-session-stats 0)
+            ("name" pi-set-session-name 1)
+            ("set-thinking-level" pi-set-thinking-level 0)
+            ("cycle-model" pi-cycle-model 0)
+            ("cycle-thinking-level" pi-cycle-thinking-level 0)
+            ("set-steering-mode" pi-set-steering-mode 0)
+            ("set-follow-up-mode" pi-set-follow-up-mode 0)
+            ("fork" pi-fork 0)
+            ("clone" pi-clone 0)
+            ("copy" pi-copy 0)
+            ("export" pi-export 1)
+            ("quit" pi-quit-chat 0)
+            ("exit" pi-quit-chat 0))
 
      Alist mapping slash command names to command specs.
 
@@ -293,10 +303,13 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
  -- User Option: pi-insert-tool-args-functions
 
-          (("read" . pi--insert-read-args) ("write" . pi--insert-write-args)
-           ("edit" . pi--insert-edit-args) ("bash" . pi--insert-bash-args)
-           ("grep" . pi--insert-grep-args) ("find" . pi--insert-find-args)
-           ("ls" . pi--insert-ls-args))
+          '(("read" . pi--insert-read-args)
+            ("write" . pi--insert-write-args)
+            ("edit" . pi--insert-edit-args)
+            ("bash" . pi--insert-bash-args)
+            ("grep" . pi--insert-grep-args)
+            ("find" . pi--insert-find-args)
+            ("ls" . pi--insert-ls-args))
 
      Alist mapping tool names to inserter functions.
 
@@ -305,10 +318,13 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
  -- User Option: pi-insert-tool-result-functions
 
-          (("bash" . pi--insert-bash-result) ("read" . pi--insert-read-result)
-           ("write" . pi--insert-write-result) ("edit" . pi--insert-edit-result)
-           ("grep" . pi--insert-grep-result) ("find" . pi--insert-find-result)
-           ("ls" . pi--insert-ls-result))
+          '(("bash" . pi--insert-bash-result)
+            ("read" . pi--insert-read-result)
+            ("write" . pi--insert-write-result)
+            ("edit" . pi--insert-edit-result)
+            ("grep" . pi--insert-grep-result)
+            ("find" . pi--insert-find-result)
+            ("ls" . pi--insert-ls-result))
 
      Alist mapping tool names to result inserter functions.
 
@@ -317,8 +333,10 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
  -- User Option: pi-visit-tool-result-functions
 
-          (("read" . pi--visit-read-result) ("write" . pi--visit-write-result)
-           ("edit" . pi--visit-edit-result) ("grep" . pi--visit-grep-result))
+          '(("read" . pi--visit-read-result)
+            ("write" . pi--visit-write-result)
+            ("edit" . pi--visit-edit-result)
+            ("grep" . pi--visit-grep-result))
 
      Alist mapping tool names to result visitor functions.
 
@@ -327,15 +345,16 @@ File: pi.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
  -- User Option: pi-visit-tool-call-functions
 
-          (("read" . pi--visit-read-call) ("write" . pi--visit-write-call)
-           ("edit" . pi--visit-edit-call))
+          '(("read" . pi--visit-read-call)
+            ("write" . pi--visit-write-call)
+            ("edit" . pi--visit-edit-call))
 
      Alist mapping tool names to call visitor functions.
 
      Each entry is (TOOL-NAME .  FUNCTION) where FUNCTION is called with
      (ARGS) to visit the relevant location of the tool call.
 
- -- User Option: pi-insert-custom-message-functions nil
+ -- User Option: pi-insert-custom-message-functions '()
 
      Alist mapping custom message types to inserter functions.
 
@@ -372,7 +391,7 @@ Node: Sending Context3278
 Node: Sandbox4060
 Node: How It Works4422
 Node: Keybindings4868
-Node: Custom Variables6828
+Node: Custom Variables6996
 
 End Tag Table
 

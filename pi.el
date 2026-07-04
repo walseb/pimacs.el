@@ -908,7 +908,7 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
              (pi--insert-thinking (pi--fill-string thinking-text)))))
        (unless (string-empty-p text)
          (pi--widget-save-excursion
-           (pi-section--create-section 'text pi-section--root-section
+           (pi-section--create-section 'assistant pi-section--root-section
              (pi--insert-role-prefix "assistant")
              (insert (pi--render-markdown text)))))
        (dolist (tool-call tool-calls)
@@ -987,7 +987,8 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
              (if pi--text-section
                  (pi-section--append-section pi--text-section
                    (insert delta))
-               (setq pi--text-section (pi-section--new-section 'text pi-section--root-section))
+               (setq pi--text-section (pi-section--new-section (if (equal role "user") 'user 'assistant)
+                                                               pi-section--root-section))
                (pi-section--insert-section pi--text-section
                  (pi--insert-role-prefix role)
                  (insert delta))))))
@@ -1029,7 +1030,7 @@ When PRESERVE-CHAT is non-nil, the chat buffer is not killed."
 
       (unless (string-empty-p text)
         (pi--widget-save-excursion
-          (pi-section--create-or-replace-section pi--text-section 'text pi-section--root-section
+          (pi-section--create-or-replace-section pi--text-section (if (equal role "user") 'user 'assistant) pi-section--root-section
             (pi--insert-role-prefix role)
             (insert text)))))
     (when (and (equal role "assistant") (not (string-empty-p text)))
@@ -2444,6 +2445,18 @@ With a prefix argument OTHER-WINDOW, visit in other window."
     (t
      (pi--visit-file-at-point other-window))))
 
+(defun pi-goto-next-user-message ()
+  "Go to the next user message."
+  (interactive)
+  (pi--with-chat-buffer
+    (pi-section--goto-next-section-of-type 'user)))
+
+(defun pi-goto-previous-user-message ()
+  "Go to the previous user message."
+  (interactive)
+  (pi--with-chat-buffer
+    (pi-section--goto-previous-section-of-type 'user)))
+
 (defvar-keymap pi-chat-mode-map
   :doc "Keymap for `pi-chat-mode'."
   :parent special-mode-map
@@ -2453,8 +2466,10 @@ With a prefix argument OTHER-WINDOW, visit in other window."
   "C-i" #'pi-toggle-section
   "n" #'pi-goto-next-section
   "M-n" #'pi-goto-next-section
+  "N" #'pi-goto-next-user-message
   "p" #'pi-goto-previous-section
   "M-p" #'pi-goto-previous-section
+  "P" #'pi-goto-previous-user-message
   "M-g l" #'pi-goto-last-section
   "l" #'pi-goto-last-section
   "i" #'pi-focus-prompt

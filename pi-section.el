@@ -233,66 +233,124 @@ is a sublist of LIST (as if '* matched zero or more arbitrary elements of LIST)"
       (setq secs (cdr secs)))
     prev))
 
-(defun pi-section--next-section (section)
-  "Return the section that is after SECTION."
+(defun pi-section--walk-sections (section step predicate)
+  "Walk from SECTION using STEP until PREDICATE matches.
+Return the first matching section, or nil if there is none."
+  (setq section (and section (funcall step section)))
+  (while (and section
+              (not (funcall predicate section)))
+    (setq section (funcall step section)))
+  section)
+
+(defun pi-section--navigable-children (section)
+  "Return the child sections of SECTION that should be navigated."
+  (and (pi-section--visible-p section)
+       (pi-section-children section)))
+
+(defun pi-section--next-after-subtree-step (section)
+  "Return the first section after SECTION's subtree in tree order."
   (let ((parent (pi-section-parent section)))
     (if parent
         (let ((next (cadr (memq section
                                 (pi-section-children parent)))))
           (or next
-              (pi-section--next-section parent))))))
+              (pi-section--next-after-subtree-step parent))))))
+
+(defun pi-section--next-section-step (section)
+  "Return the section immediately after SECTION in tree order."
+  (or (car (pi-section--navigable-children section))
+      (pi-section--next-after-subtree-step section)))
+
+(defun pi-section--next-section (section)
+  "Return the section that is after SECTION."
+  (pi-section--walk-sections section #'pi-section--next-section-step
+                             (lambda (_section) t)))
+
+(defun pi-section--next-section-of-type (section type)
+  "Return the first section after SECTION whose type is TYPE."
+  (pi-section--walk-sections section #'pi-section--next-section-step
+                             (lambda (next)
+                               (eq (pi-section-type next) type))))
+(defun pi-section--next-target-at-point ()
+  "Return the section `pi-goto-next-section' would jump to from point."
+  (let ((section (pi-section--current-section)))
+    (and section
+         (or (pi-section--find-section-after (point)
+                                             (pi-section--navigable-children section))
+             (pi-section--next-after-subtree-step section)))))
+
+(defun pi-section--goto-next-section-of-type (type)
+  "Go to the next pi section whose type is TYPE."
+  (let* ((target (pi-section--next-target-at-point))
+         (next (and target
+                    (if (eq (pi-section-type target) type)
+                        target
+                      (pi-section--next-section-of-type target type)))))
+    (if next
+        (goto-char (pi-section-beginning next))
+      (message "No next %s section" type))))
 
 (defun pi-goto-next-section ()
   "Go to the next pi section."
   (interactive)
-  (let* ((section (pi-section--current-section))
-         (next (and section
-                    (or (and (pi-section--visible-p section)
-                             (pi-section-children section)
-                             (pi-section--find-section-after (point)
-                                                             (pi-section-children
-                                                              section)))
-                        (pi-section--next-section section)))))
-    (cond
-     (next
-      (goto-char (pi-section-beginning next)))
-     (t (message "No next section")))))
+  (if-let ((next (pi-section--next-target-at-point)))
+      (goto-char (pi-section-beginning next))
+    (message "No next section")))
 
-(defun pi-section--prev-section (section)
-  "Return the section that is before SECTION."
+(defun pi-section--prev-section-step (section)
+  "Return the section immediately before SECTION in tree order."
   (let ((parent (pi-section-parent section)))
     (if parent
         (let ((prev (cadr (memq section
                                 (reverse (pi-section-children parent))))))
           (cond (prev
-                 (while (and (pi-section--visible-p prev)
-                             (pi-section-children prev))
-                   (setq prev (car (reverse (pi-section-children prev)))))
+                 (while (pi-section--navigable-children prev)
+                   (setq prev (car (last (pi-section--navigable-children prev)))))
                  prev)
                 (t
                  parent))))))
 
-(defun pi-goto-previous-section ()
-  "Goto the previous pi section."
-  (interactive)
+(defun pi-section--prev-section (section)
+  "Return the section that is before SECTION."
+  (pi-section--walk-sections section #'pi-section--prev-section-step
+                             (lambda (_section) t)))
+
+(defun pi-section--prev-section-of-type (section type)
+  "Return the first section before SECTION whose type is TYPE."
+  (pi-section--walk-sections section #'pi-section--prev-section-step
+                             (lambda (prev)
+                               (eq (pi-section-type prev) type))))
+(defun pi-section--previous-target-at-point ()
+  "Return the section `pi-goto-previous-section' would jump to from point."
   (let ((section (pi-section--current-section)))
     (cond
      ((null section)
-      (if (and pi-section--root-section
-               (pi-section-children pi-section--root-section))
-          (goto-char (pi-section-beginning (car (last (pi-section-children pi-section--root-section)))))
-        (message "No previous section")))
+      (and pi-section--root-section
+           (car (last (pi-section-children pi-section--root-section)))))
      ((= (point) (pi-section-beginning section))
-      (let ((prev (pi-section--prev-section (pi-section--current-section))))
-        (if prev
-            (goto-char (pi-section-beginning prev))
-          (message "No previous section"))))
+      (pi-section--prev-section section))
      (t
-      (let ((prev (pi-section--find-section-before (point)
-                                                   (pi-section-children
-                                                    section))))
-        (goto-char (pi-section-beginning (or prev section)))
-        (goto-char (pi-section-beginning (or prev section))))))))
+      (or (pi-section--find-section-before (point)
+                                           (pi-section--navigable-children section))
+          section)))))
+
+(defun pi-goto-previous-section ()
+  "Goto the previous pi section."
+  (interactive)
+  (if-let ((prev (pi-section--previous-target-at-point)))
+      (goto-char (pi-section-beginning prev))
+    (message "No previous section")))
+
+(defun pi-section--goto-previous-section-of-type (type)
+  "Go to the previous pi section whose type is TYPE."
+  (let* ((target (pi-section--previous-target-at-point))
+         (prev (and target
+                    (if (eq (pi-section-type target) type)
+                        target
+                      (pi-section--prev-section-of-type target type)))))
+    (if prev
+        (goto-char (pi-section-beginning prev))
+      (message "No previous %s section" type))))
 
 (defun pi-goto-last-section ()
   "Go to the last child section of `pi-section--root-section'."

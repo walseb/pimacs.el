@@ -292,20 +292,26 @@
 
 ;; ─── pi-section--next-section / pi-section--prev-section ─────────────────────────────────
 
-(ert-deftest pi-section--next-section-sibling ()
+(ert-deftest pi-section--next-section-first-child ()
   (pi-section-tests-with-demo-buffer
     (goto-char 1)
-    (let* ((build (pi-section--current-section))
-           (next (pi-section--next-section build)))
+    (let ((next (pi-section--next-section (pi-section--current-section))))
       (should next)
-      (should (eq (pi-section-type next) 'logs)))))
+      (should (eq (pi-section-type next) 'compile)))))
 
-(ert-deftest pi-section--next-section-goes-to-parent ()
+(ert-deftest pi-section--next-section-goes-to-sibling-before-parent ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char (point-min))
+    (forward-line 5)
+    (let ((next (pi-section--next-section (pi-section--current-section))))
+      (should next)
+      (should (eq (pi-section-type next) 'integration-tests)))))
+
+(ert-deftest pi-section--next-section-goes-to-parent-sibling ()
   (pi-section-tests-with-demo-buffer
     (goto-char (point-min))
     (forward-line 8)
-    (let* ((unit-tests (pi-section--current-section))
-           (next (pi-section--next-section unit-tests)))
+    (let ((next (pi-section--next-section (pi-section--current-section))))
       (should next)
       (should (eq (pi-section-type next) 'logs)))))
 
@@ -315,6 +321,31 @@
     (forward-line -1)
     (let ((section (pi-section--section-at (point))))
       (should (null (pi-section--next-section section))))))
+
+(ert-deftest pi-section--next-section-of-type ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char 1)
+    (let ((next (pi-section--next-section-of-type (pi-section--current-section) 'deploy)))
+      (should next)
+      (should (eq (pi-section-type next) 'deploy)))))
+
+(ert-deftest pi-section--next-section-of-type-missing ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char 1)
+    (let ((next (pi-section--next-section-of-type (pi-section--current-section) 'missing)))
+      (should (null next)))))
+
+(ert-deftest pi-section--next-section-walks-tree-in-order ()
+  (pi-section-tests-with-demo-buffer
+    (let* ((compile (pi-section--find-section '(build compile) pi-section--root-section))
+           (next1 (pi-section--next-section compile))
+           (next2 (pi-section--next-section next1))
+           (next3 (pi-section--next-section next2))
+           (next4 (pi-section--next-section next3)))
+      (should (eq (pi-section-type next1) 'test))
+      (should (eq (pi-section-type next2) 'unit-tests))
+      (should (eq (pi-section-type next3) 'integration-tests))
+      (should (eq (pi-section-type next4) 'logs)))))
 
 (ert-deftest pi-section--prev-section-sibling ()
   (pi-section-tests-with-demo-buffer
@@ -333,6 +364,66 @@
            (prev (pi-section--prev-section compile)))
       (should prev)
       (should (eq (pi-section-type prev) 'build)))))
+
+(ert-deftest pi-section--prev-section-of-type ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char (point-min))
+    (forward-line 10)
+    (let ((prev (pi-section--prev-section-of-type (pi-section--current-section) 'build)))
+      (should prev)
+      (should (eq (pi-section-type prev) 'build)))))
+
+(ert-deftest pi-section--prev-section-of-type-missing ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char 1)
+    (let ((prev (pi-section--prev-section-of-type (pi-section--current-section) 'missing)))
+      (should (null prev)))))
+
+(ert-deftest pi-section--prev-section-walks-tree-in-reverse-order ()
+  (pi-section-tests-with-demo-buffer
+    (let* ((worker-log (pi-section--find-section '(logs worker-log) pi-section--root-section))
+           (prev1 (pi-section--prev-section worker-log))
+           (prev2 (pi-section--prev-section prev1))
+           (prev3 (pi-section--prev-section prev2))
+           (prev4 (pi-section--prev-section prev3)))
+      (should (eq (pi-section-type prev1) 'server-log))
+      (should (eq (pi-section-type prev2) 'logs))
+      (should (eq (pi-section-type prev3) 'integration-tests))
+      (should (eq (pi-section-type prev4) 'unit-tests)))))
+
+(ert-deftest pi-section--goto-next-section-of-type ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char 1)
+    (pi-section--goto-next-section-of-type 'deploy)
+    (should (eq (pi-section-type (pi-section--current-section)) 'deploy))))
+
+(ert-deftest pi-section--next-section-skips-hidden-children ()
+  (pi-section-tests-with-demo-buffer
+    (let ((build (pi-section--find-section '(build) pi-section--root-section)))
+      (pi-section--set-visibility build :hide)
+      (should (eq (pi-section-type (pi-section--next-section build)) 'logs)))))
+
+(ert-deftest pi-section--prev-section-skips-hidden-children ()
+  (pi-section-tests-with-demo-buffer
+    (let ((logs (pi-section--find-section '(logs) pi-section--root-section))
+          (build (pi-section--find-section '(build) pi-section--root-section)))
+      (pi-section--set-visibility build :hide)
+      (should (eq (pi-section-type (pi-section--prev-section logs)) 'build)))))
+
+(ert-deftest pi-section--goto-previous-section-of-type ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char (point-min))
+    (forward-line 10)
+    (pi-section--goto-previous-section-of-type 'build)
+    (should (eq (pi-section-type (pi-section--current-section)) 'build))))
+
+(ert-deftest pi-section--goto-previous-section-of-type-current-section ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char (point-min))
+    (forward-line 11)
+    (pi-section--goto-previous-section-of-type 'logs)
+    (should (eq (pi-section-type (pi-section--current-section)) 'logs))
+    (should (= (point) (pi-section-beginning (pi-section--current-section))))))
 
 ;; ─── pi-section--delete-section ────────────────────────────────────────────
 
