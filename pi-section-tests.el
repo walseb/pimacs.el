@@ -375,6 +375,12 @@
       (should prev)
       (should (eq (pi-section-type prev) 'build)))))
 
+(ert-deftest pi-section--prev-section-first-top-level-is-nil ()
+  (pi-section-tests-with-demo-buffer
+    (goto-char (point-min))
+    (let ((build (pi-section--current-section)))
+      (should (null (pi-section--prev-section build))))))
+
 (ert-deftest pi-section--prev-section-of-type ()
   (pi-section-tests-with-demo-buffer
     (goto-char (point-min))

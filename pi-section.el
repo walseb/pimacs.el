@@ -335,16 +335,15 @@ Return the first matching section, or nil if there is none."
 
 (defun pi-section--prev-section-step (section)
   "Return the section immediately before SECTION in tree order."
-  (let ((parent (pi-section-parent section)))
-    (if parent
-        (let ((prev (cadr (memq section
-                                (reverse (pi-section-children parent))))))
-          (cond (prev
-                 (while (pi-section--navigable-children prev)
-                   (setq prev (car (last (pi-section--navigable-children prev)))))
-                 prev)
-                (t
-                 parent))))))
+  (when-let ((parent (pi-section-parent section)))
+    (if-let ((prev (cadr (memq section
+                               (reverse (pi-section-children parent))))))
+        (progn
+          (while (pi-section--navigable-children prev)
+            (setq prev (car (last (pi-section--navigable-children prev)))))
+          prev)
+      (and (pi-section-parent parent)
+           parent))))
 
 (defun pi-section--prev-section (section)
   "Return the section that is before SECTION."
