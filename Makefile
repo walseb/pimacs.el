@@ -18,7 +18,7 @@ setup: cask
 .PHONY: compile
 compile: cask
 	@cask emacs -batch -L . -L test \
-	  -f batch-byte-compile pi.el pi-section.el pi-edit.el; \
+	  -f batch-byte-compile pi-utils.el pi.el pi-section.el pi-edit.el; \
 	  (ret=$$? ; cask clean-elc && exit $$ret)
 
 .PHONY: package-lint
@@ -26,7 +26,7 @@ package-lint: cask
 	@cask emacs -Q --batch \
 	  --eval "(setq package-lint-main-file \"pi.el\")" \
 	  -f package-lint-batch-and-exit \
-	  pi.el pi-section.el pi-edit.el
+	  pi-utils.el pi.el pi-section.el pi-edit.el
 
 .PHONY: test
 test: compile
@@ -38,7 +38,7 @@ integration: compile
 
 .PHONY: format
 format:
-	@cask emacs --batch -L . -l pi.el -l pi-section.el -l pi-edit.el -l pi-tests.el -l pi-section-tests.el -l integration/pi-integration-tests.el \
+	@cask emacs --batch -L . -l pi-utils.el -l pi.el -l pi-section.el -l pi-edit.el -l pi-tests.el -l pi-section-tests.el -l integration/pi-integration-tests.el \
 	  --eval " \
 	  (let ((inhibit-message t) \
                 (message-log-max nil)) \
@@ -47,7 +47,7 @@ format:
 	      (with-current-buffer (find-file-noselect f) \
 	        (indent-region (point-min) (point-max)) \
 	        (save-buffer))))" \
-          pi.el pi-section.el pi-edit.el pi-tests.el pi-section-tests.el integration/pi-integration-tests.el
+          pi-utils.el pi.el pi-section.el pi-edit.el pi-tests.el pi-section-tests.el integration/pi-integration-tests.el
 
 
 .PHONY: sandbox
@@ -69,6 +69,7 @@ define ESCRIPT
 (with-temp-buffer
   (require 'subr-x)
   (insert-file-contents "pi-section.el")
+  (insert-file-contents "pi-utils.el")
   (insert-file-contents "pi.el")
   (while
       (ignore-errors
@@ -114,6 +115,7 @@ docs-lint:
 	  --eval "(require 'checkdoc)" \
 	  --eval "(checkdoc-file \"pi.el\")" \
 	  --eval "(checkdoc-file \"pi-section.el\")" \
+	  --eval "(checkdoc-file \"pi-utils.el\")" \
 	  --eval "(checkdoc-file \"pi-edit.el\")" 2>&1 | grep '^pi[.-]' | grep -v 'All variables and subroutines might as well have a documentation string' || true
 
 .PHONY: docs
