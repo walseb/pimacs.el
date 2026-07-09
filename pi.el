@@ -1659,7 +1659,7 @@ Shows context usage and model info."
 ;;; Commands
 
 (defun pi--parse-slash-command (prompt)
-  (when (string-match "^[ \t]*/\\([-a-zA-Z0-9]+\\)\\([ \t].*\\)?$" prompt)
+  (when (string-match "\\`[ \t\n]*/\\([-a-zA-Z0-9]+\\)\\([ \t].*\\)?$" prompt)
     (let* ((name (match-string-no-properties 1 prompt))
            (raw (and (match-beginning 2)
                      (string-trim-left (match-string-no-properties 2 prompt))))
@@ -1673,10 +1673,10 @@ Shows context usage and model info."
           (cons cmd args))))))
 
 (defun pi--parse-bang-command (prompt)
-  (pi--parse-bang-command-with-regex prompt "^[ \t]*!\\([^!].*\\)$"))
+  (pi--parse-bang-command-with-regex prompt "\\`[ \t\n]*!\\([^!].*\\)$"))
 
 (defun pi--parse-double-bang-command (prompt)
-  (pi--parse-bang-command-with-regex prompt "^[ \t]*!!\\(.+\\)$"))
+  (pi--parse-bang-command-with-regex prompt "\\`[ \t\n]*!!\\(.+\\)$"))
 
 (defun pi--parse-bang-command-with-regex (prompt regex)
   (when (string-match regex prompt)
