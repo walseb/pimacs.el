@@ -1919,7 +1919,8 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
     (:low     . "Light reasoning ~2k tokens")
     (:medium  . "Moderate reasoning ~8k tokens")
     (:high    . "Deep reasoning ~16k tokens")
-    (:xhigh   . "Maximum reasoning ~32k tokens")))
+    (:xhigh   . "Extra high reasoning ~32k tokens")
+    (:max     . "Maximum reasoning")))
 
 (defvar pi--prompt-modes
   '((:one-at-a-time . "One at a time")
@@ -1930,10 +1931,10 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
         (reasoning (plist-get model :reasoning))
         result)
     (when (and reasoning (not (eq reasoning 'json-false)))
-      (dolist (level '(:minimal :low :medium :high :xhigh))
+      (dolist (level '(:minimal :low :medium :high :xhigh :max))
         (let ((mapped (plist-get thinking-level-map level)))
           (unless (eq mapped 'json-null)
-            (if (eq level :xhigh)
+            (if (member level '(:xhigh :max))
                 (when mapped
                   (push level result))
               (push level result))))))
