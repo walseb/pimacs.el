@@ -2353,9 +2353,10 @@ With a prefix argument OTHER-WINDOW, visit in other window."
 (defun pi-quit-chat ()
   "Quit the current chat window."
   (interactive)
-  (when-let (buffer (pi--current-chat))
-    (kill-buffer buffer))
-  (pi--kill-agent))
+  (if-let (agent (pi--current-agent))
+      (pi--kill-agent)
+    (when-let (buffer (pi--current-chat))
+      (kill-buffer buffer))))
 
 (defun pi--switch-session (session-file message &optional cb)
   "Switch to an existing session file and refresh.
