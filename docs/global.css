@@ -20,7 +20,7 @@ div.example pre {
     padding: 1em;
 }
 
-.chapter-level-extent > .mini-toc {
+.chapter-level-extent > .mini-toc, .section-level-extent > .mini-toc {
     display: none;
 }
 

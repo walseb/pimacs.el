@@ -555,15 +555,15 @@ with the message plist to insert the custom message content."
 
 (defun pi--create-image (item)
   (when (display-images-p)
-   (when-let ((data (plist-get item :data))
-              (mime-type (plist-get item :mimeType))
-              (image-type (pi--alist-get-equal mime-type pi--image-type-alist))
-              (raw-data (base64-decode-string data))
-              (max-width (floor (* 0.9 (window-pixel-width))))
-              (max-height (floor (* 0.9 (window-pixel-height)))))
-     (create-image raw-data image-type t
-                   :max-width max-width
-                   :max-height max-height))))
+    (when-let ((data (plist-get item :data))
+               (mime-type (plist-get item :mimeType))
+               (image-type (pi--alist-get-equal mime-type pi--image-type-alist))
+               (raw-data (base64-decode-string data))
+               (max-width (floor (* 0.9 (window-pixel-width))))
+               (max-height (floor (* 0.9 (window-pixel-height)))))
+      (create-image raw-data image-type t
+                    :max-width max-width
+                    :max-height max-height))))
 
 (defun pi--role-face (role)
   (pcase role
@@ -1586,8 +1586,8 @@ If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
 (defun pi--add-attached-image (mime-type data)
   (pi--widget-save-excursion
     (let* ((data (if (multibyte-string-p data)
-                             (encode-coding-string data 'raw-text-unix)
-                           data))
+                     (encode-coding-string data 'raw-text-unix)
+                   data))
            (base64-data (base64-encode-string data t))
            (image-plist (list :type "image" :data base64-data :mimeType (symbol-name mime-type))))
       (setq pi--attached-images (vconcat pi--attached-images (vector image-plist)))
@@ -1612,7 +1612,8 @@ If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
              (after (cl-subseq pi--attached-images (1+ index)))
              (images (append before after nil)))
         (setq pi--attached-images (vconcat images))
-        (pi--update-images-preview)))))
+        (pi--update-images-preview)
+        (pi-focus-prompt)))))
 
 (defun pi--update-images-preview ()
   (let ((images pi--attached-images))

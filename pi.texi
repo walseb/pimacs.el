@@ -124,6 +124,7 @@ input area.
 * File Name Completion::
 * Bash::
 * Sending Context::
+* Images::
 @end menu
 
 @node Slash Commands
@@ -234,6 +235,33 @@ prompt.
 @item @code{pi-send-filename} @tab Append the current buffer's filename (prefixed with @code{@@}) to the prompt input.
 @item @code{pi-send-flycheck-errors} @tab Append the Flycheck errors at point to the prompt input.  Falls back to all current errors in the buffer when there are none at point.
 @end multitable
+
+@node Images
+@section Images
+
+You can attach images to your prompt to provide visual context to the
+agent.  Images are displayed as thumbnail previews above the prompt
+input area and are sent along with your message.  The agent may also
+render images inline in its responses, for example when using the
+@code{read} tool on a file that contains images.
+
+@subsection Supported Formats
+
+The following image formats are supported:
+
+@itemize @bullet
+@item PNG
+@item JPEG
+@item GIF
+@item WebP
+@end itemize
+
+
+Drag an image file from your file manager and drop it into the Pi
+chat buffer, or paste a supported image from the clipboard via
+@code{yank-media}.  To remove an attached image, click on the
+thumbnail with the mouse, or place point on it and press
+@kbd{backspace} or @kbd{delete}.
 
 @node Sandbox
 @chapter Sandbox

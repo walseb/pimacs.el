@@ -93,6 +93,7 @@ anywhere in the chat buffer to move point to the prompt input area.
 * File Name Completion::
 * Bash::
 * Sending Context::
+* Images::
 
 
 File: pi.info,  Node: Slash Commands,  Next: File Name Completion,  Up: Usage
@@ -161,7 +162,7 @@ without adding it to the conversation context.
      ! echo "hello"
 
 
-File: pi.info,  Node: Sending Context,  Prev: Bash,  Up: Usage
+File: pi.info,  Node: Sending Context,  Next: Images,  Prev: Bash,  Up: Usage
 
 3.4 Sending Context
 ===================
@@ -179,6 +180,33 @@ Command                   Description
                           prompt input.  Falls back to all current
                           errors in the buffer when there are none at
                           point.
+
+
+File: pi.info,  Node: Images,  Prev: Sending Context,  Up: Usage
+
+3.5 Images
+==========
+
+You can attach images to your prompt to provide visual context to the
+agent.  Images are displayed as thumbnail previews above the prompt
+input area and are sent along with your message.  The agent may also
+render images inline in its responses, for example when using the ‘read’
+tool on a file that contains images.
+
+3.5.1 Supported Formats
+-----------------------
+
+The following image formats are supported:
+
+   • PNG
+   • JPEG
+   • GIF
+   • WebP
+
+   Drag an image file from your file manager and drop it into the Pi
+chat buffer, or paste a supported image from the clipboard via
+‘yank-media’.  To remove an attached image, click on the thumbnail with
+the mouse, or place point on it and press ‘backspace’ or ‘delete’.
 
 
 File: pi.info,  Node: Sandbox,  Next: How It Works,  Prev: Usage,  Up: Top
@@ -434,14 +462,15 @@ Node: Top730
 Node: Introduction980
 Node: Setup1229
 Node: Usage1804
-Node: Slash Commands2372
-Node: File Name Completion4601
-Node: Bash4921
-Node: Sending Context5184
-Node: Sandbox5966
-Node: How It Works6328
-Node: Keybindings6774
-Node: Custom Variables8902
+Node: Slash Commands2383
+Node: File Name Completion4612
+Node: Bash4932
+Node: Sending Context5195
+Node: Images5992
+Node: Sandbox6829
+Node: How It Works7191
+Node: Keybindings7637
+Node: Custom Variables9765
 
 End Tag Table
 
