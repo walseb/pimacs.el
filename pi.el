@@ -46,6 +46,8 @@
 (require 'ansi-color)
 (require 'diff-mode)
 (require 'imenu)
+(require 'seq)
+(require 'mailcap)
 
 (defgroup pi nil
   "Emacs client for Pi."
@@ -329,6 +331,8 @@ with the message plist to insert the custom message content."
 (defvar pi--chats (make-hash-table :test 'equal))
 
 (pi--def-permanent-buffer-local pi--prompt-widget nil)
+(pi--def-permanent-buffer-local pi--attached-images (vector))
+(pi--def-permanent-buffer-local pi--attached-images-widget nil)
 (pi--def-permanent-buffer-local pi--prompt-before-widget nil)
 (pi--def-permanent-buffer-local pi--prompt-after-widget nil)
 (pi--def-permanent-buffer-local pi--prompt-widget-lines nil)
@@ -542,17 +546,17 @@ with the message plist to insert the custom message content."
                                      :header (pi--content-header content)
                                      :content content)))))
 
+(defvar pi--image-type-alist
+  '(("image/png" . png)
+    ("image/jpeg" . jpeg)
+    ("image/gif" . gif)
+    ("image/webp" . webp))
+  "Alist mapping MIME type strings to image type symbols.")
+
 (defun pi--create-image (item)
   (when-let ((data (plist-get item :data))
              (mime-type (plist-get item :mimeType))
-             (image-type (pcase mime-type
-                           ("image/png" 'png)
-                           ("image/jpeg" 'jpeg)
-                           ("image/gif" 'gif)
-                           ("image/svg+xml" 'svg)
-                           ("image/webp" 'webp)
-                           ("image/tiff" 'tiff)
-                           (_ nil)))
+             (image-type (pi--alist-get-equal mime-type pi--image-type-alist))
              (raw-data (base64-decode-string data))
              (max-width (floor (* 0.9 (window-pixel-width))))
              (max-height (floor (* 0.9 (window-pixel-height)))))
@@ -1526,6 +1530,8 @@ Shows context usage and model info."
                (equal prompt (ring-ref pi--prompt-history 0)))
     (ring-insert pi--prompt-history prompt))
   (setq pi--prompt-history-index 0)
+  (setq pi--attached-images (vector))
+  (pi--update-images-preview)
   (pi-section-autohide))
 
 (defun pi-send-prompt (&optional prompt streaming-behavior)
@@ -1553,12 +1559,15 @@ Shows context usage and model info."
           (pi-bash bang)
           (pi--clear-prompt prompt))
          (t
-          (pi--send-command
-           "prompt" (list :message prompt
-                          :streamingBehavior (when-let (behavior (or streaming-behavior pi-prompt-streaming-behavior))
-                                               (symbol-name behavior)))
-           (pi--on-response-success-callback resp
-             (pi--clear-prompt prompt)))))))))
+          (let ((args (list :message prompt
+                            :streamingBehavior (when-let (behavior (or streaming-behavior pi-prompt-streaming-behavior))
+                                                 (symbol-name behavior)))))
+            (unless (seq-empty-p pi--attached-images)
+              (setq args (nconc args (list :images pi--attached-images))))
+            (pi--send-command
+             "prompt" args
+             (pi--on-response-success-callback resp
+               (pi--clear-prompt prompt))))))))))
 
 
 (defun pi-send-prompt-alternate (&optional prompt)
@@ -1573,13 +1582,86 @@ If `pi-prompt-streaming-behavior' is `followUp', use `steer' and vice versa."
     (when (and prompt-text (not (string-empty-p prompt-text)))
       (pi-send-prompt prompt-text alt-behavior))))
 
+(defun pi--add-attached-image (mime-type data)
+  (pi--widget-save-excursion
+    (let* ((data (if (multibyte-string-p data)
+                             (encode-coding-string data 'raw-text-unix)
+                           data))
+           (base64-data (base64-encode-string data t))
+           (image-plist (list :type "image" :data base64-data :mimeType (symbol-name mime-type))))
+      (setq pi--attached-images (vconcat pi--attached-images (vector image-plist)))
+      (pi--update-images-preview)))
+  (pi-focus-prompt))
+
+(defvar pi--image-remove-map
+  (let ((map (make-sparse-keymap)))
+    (define-key map [mouse-1] #'pi--image-remove-at-point)
+    (define-key map [backspace] #'pi--image-remove-at-point)
+    (define-key map [delete] #'pi--image-remove-at-point)
+    map)
+  "Keymap used for removing attached images.")
+
+(defun pi--image-remove-at-point ()
+  "Remove the attached image at point."
+  (interactive)
+  (let ((index (get-text-property (point) 'pi-image-index)))
+    (if (null index)
+        (user-error "No image at point")
+      (let* ((before (cl-subseq pi--attached-images 0 index))
+             (after (cl-subseq pi--attached-images (1+ index)))
+             (images (append before after nil)))
+        (setq pi--attached-images (vconcat images))
+        (pi--update-images-preview)))))
+
+(defun pi--update-images-preview ()
+  (let ((images pi--attached-images))
+    (if (seq-empty-p images)
+        (widget-value-set pi--attached-images-widget pi--empty-widget-text)
+      (let ((preview "\n"))
+        (dotimes (i (length images))
+          (let* ((plist (aref images i))
+                 (mime-type (plist-get plist :mimeType))
+                 (base64-data (plist-get plist :data))
+                 (image-type (pi--alist-get-equal mime-type pi--image-type-alist))
+                 (image (ignore-errors
+                          (create-image (base64-decode-string base64-data)
+                                        image-type t
+                                        :data-p t
+                                        :max-width 200
+                                        :max-height 100
+                                        :margin '(4 . 4)
+                                        :ascent 100))))
+            (when image
+              (setq preview (concat preview
+                                    (propertize " " 'display image
+                                                'keymap pi--image-remove-map
+                                                'pi-image-index i
+                                                'mouse-face 'highlight
+                                                'help-echo (format "Remove image %d (backspace/delete)" (1+ i))))))))
+        (unless (string-empty-p preview)
+          (setq preview (concat preview "\n")))
+        (widget-value-set pi--attached-images-widget preview)))))
+
+(defun pi--check-image-type (mime-type)
+  (unless (pi--alist-get-equal (symbol-name mime-type) pi--image-type-alist)
+    (user-error "Unsupported image type: %s" mime-type)))
+
 (defun pi--dnd-handler (url _action)
   (when-let ((file (dnd-get-local-file-name url t)))
-    (let ((path (if (file-in-directory-p file (pi--project-root))
-                    (file-relative-name file (pi--project-root))
-                  file)))
-      (pi--prompt-append (format "@%s" path))))
+    (let* ((mime-string (or (mailcap-extension-to-mime (file-name-extension file t))
+                            (user-error "Can't determine MIME type for %s" file)))
+           (mime-type (intern mime-string))
+           (data (with-temp-buffer
+                   (set-buffer-multibyte nil)
+                   (insert-file-contents-literally file)
+                   (buffer-string))))
+      (pi--check-image-type mime-type)
+      (pi--add-attached-image mime-type data)))
   'private)
+
+(defun pi--yank-media-handler (mime-type data)
+  (pi--check-image-type mime-type)
+  (pi--add-attached-image mime-type data))
 
 (defun pi--prompt-append (text)
   (pi--with-chat-buffer
@@ -2345,6 +2427,7 @@ With a prefix argument OTHER-WINDOW, visit in other window."
                       completion-at-point-functions))
   (setq pi--spinner (spinner-create 'progress-bar))
   (setq pi--prompt-before-widget (widget-create 'pi-item :face 'pi-widget-face pi--empty-widget-text))
+  (setq pi--attached-images-widget (widget-create 'pi-item :face 'pi-widget-face pi--empty-widget-text))
   (setq pi--prompt-widget
         (widget-create 'editable-field
                        :keymap pi-chat-widget-field-keymap
@@ -2360,6 +2443,9 @@ With a prefix argument OTHER-WINDOW, visit in other window."
   (setq-local dnd-protocol-alist
               (cons '("^file:" . pi--dnd-handler)
                     dnd-protocol-alist))
+  (when (fboundp 'yank-media-handler)
+    (yank-media-handler (mapcar (lambda (pair) (intern (car pair))) pi--image-type-alist)
+                        #'pi--yank-media-handler))
   (widget-setup)
   (pi-focus-prompt)
   (add-hook 'kill-buffer-hook #'pi--cleanup-chat-buffer nil t)

@@ -112,6 +112,10 @@ PRED is called with KEY VALUE."
         (setq result (plist-put result (car plist) (cadr plist))
               plist (cddr plist))))))
 
+(defun pi--alist-get-equal (key alist)
+  "Like `alist-get' but compares with `equal' instead of `eq'."
+  (alist-get key alist nil nil #'equal))
+
 (defun pi--sort-entries-by-key (entries)
   (sort entries (lambda (a b) (string< (car a) (car b)))))
 
