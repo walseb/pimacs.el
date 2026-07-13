@@ -65,7 +65,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-12\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello
           from
           extension"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"tools":[{"type":"function","function":{"name":"read","description":"Read
           the contents of a file. Supports text files and images (jpg, png, gif,

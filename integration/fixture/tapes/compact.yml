@@ -66,7 +66,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-07-10\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"max_completion_tokens":100000,"tools":[{"type":"function","function":{"name":"read","description":"Read
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"max_completion_tokens":100000,"tools":[{"type":"function","function":{"name":"read","description":"Read
           the contents of a file. Supports text files and images (jpg, png, gif,
           webp, bmp). Images are sent as attachments. For text files, output is
           truncated to 2000 lines or 50KB (whichever is hit first). Use
@@ -565,7 +565,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-07-10\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello"}]},{"role":"assistant","content":"Hello!
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello"}]},{"role":"assistant","content":"Hello!
           How can I help you today?","reasoning":"The user says \"hello\" - this
           seems to be a warm greeting. There's nothing specific here that needs
           assistance or processing. I should just respond naturally as someone

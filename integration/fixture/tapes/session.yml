@@ -65,7 +65,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-11\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"say
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"say
           hello"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"tools":[{"type":"function","function":{"name":"read","description":"Read
           the contents of a file. Supports text files and images (jpg, png, gif,
           webp). Images are sent as attachments. For text files, output is

@@ -65,7 +65,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"tools":[{"type":"function","function":{"name":"read","description":"Read
           the contents of a file. Supports text files and images (jpg, png, gif,
           webp). Images are sent as attachments. For text files, output is
@@ -346,7 +346,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -1108,7 +1108,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -1460,7 +1460,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -2124,7 +2124,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -2546,7 +2546,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -2891,7 +2891,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -3225,7 +3225,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -3608,7 +3608,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -3961,7 +3961,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -4511,7 +4511,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -4904,7 +4904,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -5889,7 +5889,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -6289,7 +6289,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -6964,7 +6964,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -8293,7 +8293,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -9228,7 +9228,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -10507,7 +10507,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -11034,7 +11034,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]},{"role":"assistant","content":null,"reasoning":"The user
           wants me to list files in the current directory. I'll use the ls
           function to do
@@ -11497,7 +11497,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"tools":[{"type":"function","function":{"name":"read","description":"Read
           the contents of a file. Supports text files and images (jpg, png, gif,
           webp). Images are sent as attachments. For text files, output is
@@ -11764,7 +11764,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-06-08\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"list
           files"}]}],"stream":true,"stream_options":{"include_usage":true},"store":false,"tools":[{"type":"function","function":{"name":"read","description":"Read
           the contents of a file. Supports text files and images (jpg, png, gif,
           webp). Images are sent as attachments. For text files, output is

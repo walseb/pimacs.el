@@ -66,7 +66,7 @@ http_interactions:
           implementing\n- Always read pi .md files completely and follow links
           to related docs (e.g., tui.md for TUI API details)\nCurrent date:
           2026-07-02\nCurrent working directory:
-          /home/ananthakumaran/work/repos/pi.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello"}]},{"role":"assistant","content":"Greetings!
+          /home/ananthakumaran/work/repos/pimacs.el/integration/project"},{"role":"user","content":[{"type":"text","text":"hello"}]},{"role":"assistant","content":"Greetings!
           What would you like to discuss today?","reasoning":"The user said
           \"hello\" - this seems to be a greeting message. There's nothing
           interesting in my response that I should respond to back at this
