@@ -175,7 +175,7 @@
     (setq-local pimacs-header-line-format
                 '("model=" :model
                   " tools=" (lambda (state)
-                               (format "%s" (pimacs--plist-get state :sessionStats :toolCalls)))
+                              (format "%s" (pimacs--plist-get state :sessionStats :toolCalls)))
                   :spacer
                   "provider=" :provider))
     (pimacs-send-prompt-and-wait "/new")

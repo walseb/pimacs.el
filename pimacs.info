@@ -94,6 +94,7 @@ anywhere in the chat buffer to move point to the prompt input area.
 * Bash::
 * Sending Context::
 * Images::
+* State Lines::
 
 
 File: pimacs.info,  Node: Slash Commands,  Next: File Name Completion,  Up: Usage
@@ -182,7 +183,7 @@ Command                   Description
                           point.
 
 
-File: pimacs.info,  Node: Images,  Prev: Sending Context,  Up: Usage
+File: pimacs.info,  Node: Images,  Next: State Lines,  Prev: Sending Context,  Up: Usage
 
 3.5 Images
 ==========
@@ -207,6 +208,25 @@ The following image formats are supported:
 chat buffer, or paste a supported image from the clipboard via
 ‘yank-media’.  To remove an attached image, click on the thumbnail with
 the mouse, or place point on it and press ‘backspace’ or ‘delete’.
+
+
+File: pimacs.info,  Node: State Lines,  Prev: Images,  Up: Usage
+
+3.6 State Lines
+===============
+
+The header line displays session context and model information.  The
+mode line displays the current agent state.  Customize them with the
+‘pimacs-header-line-format’ and ‘pimacs-mode-line-format’ defcustoms.
+Both accept strings and state components; use ‘:spacer’ to right-align
+following components.
+
+     (setq pimacs-header-line-format
+           '(:context_usage :spacer
+             (:model face font-lock-function-name-face)))
+
+   See ‘pimacs-header-line-format’ for available components.  A
+component may also be a function that receives the current state plist.
 
 
 File: pimacs.info,  Node: Sandbox,  Next: How It Works,  Prev: Usage,  Up: Top
@@ -441,15 +461,17 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
      Format of the Pimacs chat header line.
 
      Strings are displayed literally.  Functions are called with the
-     state plist and their returned values are displayed.  The following
-     keywords are replaced with state information.
+     state plist and their returned values are displayed.  A keyword
+     component can include text properties using ‘propertize’ syntax.
+     For example: "‘(:model face font-lock-function-name-face)’".
+
+     The following keywords are replaced with state information.
 
      Session state keywords: ‘:model’ Model identifier.  ‘:provider’
-     Model provider.  ‘:thinking_level’ Thinking level.
-     ‘:steering_mode’ Steering mode.  ‘:follow_up_mode’ Follow-up mode.
-     ‘:session_name’ Session name.  ‘:compaction_mode’ ‘auto’ or
-     ‘manual’.  ‘:message_count’ Message count.
-     ‘:pending_message_count’ Pending message count.
+     Model provider.  ‘:thinking_level’ Thinking level.  ‘:session_name’
+     Session name.  ‘:compaction_mode’ ‘auto’ or ‘manual’.
+     ‘:message_count’ Message count.  ‘:pending_message_count’ Pending
+     message count.
 
      Session statistics keywords: ‘:user_messages’ User message count.
      ‘:assistant_messages’ Assistant message count.  ‘:tool_calls’ Tool
@@ -506,15 +528,16 @@ Node: Top746
 Node: Introduction1012
 Node: Setup1269
 Node: Usage1884
-Node: Slash Commands2479
-Node: File Name Completion4724
-Node: Bash5052
-Node: Sending Context5319
-Node: Images6127
-Node: Sandbox6972
-Node: How It Works7358
-Node: Keybindings7816
-Node: Custom Variables9974
+Node: Slash Commands2495
+Node: File Name Completion4740
+Node: Bash5068
+Node: Sending Context5335
+Node: Images6143
+Node: State Lines7008
+Node: Sandbox7696
+Node: How It Works8082
+Node: Keybindings8540
+Node: Custom Variables10698
 
 End Tag Table
 

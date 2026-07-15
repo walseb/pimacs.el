@@ -62,10 +62,12 @@
   '(:context_usage " (" :compaction_mode ")" :spacer "(" :provider ") " :model " • " :thinking_level)
   "Format of the Pimacs chat header line.
 
-Strings are displayed literally.  Functions are called with the state plist
-and their returned values are displayed.  A keyword component can include text
-properties, for example `(:model face font-lock-function-name-face)'.  The
-following keywords are replaced with state information.
+Strings are displayed literally.  Functions are called with the state
+plist and their returned values are displayed.  A keyword component can
+include text properties using `propertize' syntax.  For example:
+\"`(:model face font-lock-function-name-face)'\".
+
+The following keywords are replaced with state information.
 
 Session state keywords:
 `:model'                    Model identifier.
