@@ -1,0 +1,1 @@
+3.2k/200.0k (auto)                                  (fixture) qwen3.5:0.8b • low

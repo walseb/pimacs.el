@@ -30,7 +30,7 @@ package-lint: cask
 
 .PHONY: test
 test: compile
-	@cask emacs --batch -L . -L test -l pimacs-tests.el -l pimacs-section-tests.el --eval '(let ((ert-quiet (equal (getenv "PI_CODING_AGENT") "true"))) (ert-run-tests-batch-and-exit "$(MATCH)"))'
+	@cask emacs --batch -L . -L test -l pimacs-tests.el -l pimacs-section-tests.el -l pimacs-state-line-tests.el --eval '(let ((ert-quiet (equal (getenv "PI_CODING_AGENT") "true"))) (ert-run-tests-batch-and-exit "$(MATCH)"))'
 
 .PHONY: integration
 integration: compile
@@ -43,7 +43,7 @@ coverage: test integration
 
 .PHONY: format
 format:
-	@cask emacs --batch -L . -l pimacs-utils.el -l pimacs-state-line.el -l pimacs-core.el -l pimacs.el -l pimacs-section.el -l pimacs-edit.el -l pimacs-agent.el -l pimacs-tests.el -l pimacs-section-tests.el -l integration/pimacs-integration-tests.el \
+	@cask emacs --batch -L . -l pimacs-utils.el -l pimacs-state-line.el -l pimacs-core.el -l pimacs.el -l pimacs-section.el -l pimacs-edit.el -l pimacs-agent.el -l pimacs-tests.el -l pimacs-section-tests.el -l pimacs-state-line-tests.el -l integration/pimacs-integration-tests.el \
 	  --eval " \
 	  (let ((inhibit-message t) \
                 (message-log-max nil)) \
@@ -52,7 +52,7 @@ format:
 	      (with-current-buffer (find-file-noselect f) \
 	        (indent-region (point-min) (point-max)) \
 	        (save-buffer))))" \
-          pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el pimacs-tests.el pimacs-section-tests.el integration/pimacs-integration-tests.el
+          pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el pimacs-tests.el pimacs-section-tests.el pimacs-state-line-tests.el integration/pimacs-integration-tests.el
 
 
 .PHONY: sandbox

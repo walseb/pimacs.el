@@ -31,6 +31,7 @@
 (defconst pimacs--state-line-format-type
   '(repeat (choice (string :tag "Literal text")
                    (function :tag "Formatter function")
+                   (sexp :tag "Propertized component")
                    (const :tag "Model" :model)
                    (const :tag "Provider" :provider)
                    (const :tag "Thinking level" :thinking_level)
@@ -62,8 +63,9 @@
   "Format of the Pimacs chat header line.
 
 Strings are displayed literally.  Functions are called with the state plist
-and their returned values are displayed.  The following keywords are replaced
-with state information.
+and their returned values are displayed.  A keyword component can include text
+properties, for example `(:model face font-lock-function-name-face)'.  The
+following keywords are replaced with state information.
 
 Session state keywords:
 `:model'                    Model identifier.
@@ -119,7 +121,6 @@ See `pimacs-header-line-format' for available components."
      (mapconcat #'identity tools ", "))))
 
 (defun pimacs--format-agent-state (agent-state)
-  "Format AGENT-STATE for display."
   (if agent-state
       (if (consp agent-state)
           (format "%s(%s)"
@@ -132,13 +133,11 @@ See `pimacs-header-line-format' for available components."
   (pimacs--format-agent-state pimacs--agent-state))
 
 (defun pimacs--state-line-state ()
-  "Return the state plist used to format state lines."
   (append (list :spinner pimacs--spinner
                 :agent-state pimacs--agent-state)
           pimacs--header-line-state))
 
 (defun pimacs--format-state-line-value (value)
-  "Return VALUE as a display string."
   (cond
    ((memq value '(nil json-null)) "?")
    (t (format "%s" value))))
@@ -249,6 +248,20 @@ See `pimacs-header-line-format' for available components."
     (:spinner . pimacs--format-state-line-spinner))
   "Alist mapping state line keywords to formatter functions.")
 
+(defun pimacs--format-state-line-component (state component)
+  (cond
+   ((stringp component) component)
+   ((and (consp component) (keywordp (car component)))
+    (apply #'propertize
+           (pimacs--format-state-line-component state (car component))
+           (cdr component)))
+   ((keywordp component)
+    (if-let ((formatter (alist-get component pimacs--state-line-formatters)))
+        (funcall formatter state)
+      (error "Unknown Pimacs state-line component: %S" component)))
+   ((functionp component) (funcall component state))
+   (t (error "Unknown Pimacs state-line component: %S" component))))
+
 (defun pimacs--format-state-line (format)
   "Format the current state according to FORMAT."
   (let ((state (pimacs--state-line-state))
@@ -262,15 +275,7 @@ See `pimacs-header-line-format' for available components."
            (right-components (and spacer-position
                                   (cl-subseq format (1+ spacer-position))))
            (format-component
-            (lambda (component)
-              (cond
-               ((stringp component) component)
-               ((keywordp component)
-                (if-let ((formatter (alist-get component pimacs--state-line-formatters)))
-                    (funcall formatter state)
-                  (error "Unknown Pimacs header-line component: %S" component)))
-               ((functionp component) (funcall component state))
-               (t (error "Invalid Pimacs header-line component: %S" component)))))
+            (apply-partially #'pimacs--format-state-line-component state))
            (left (mapconcat format-component left-components ""))
            (right (mapconcat format-component right-components "")))
       (if spacer-position
@@ -282,16 +287,18 @@ See `pimacs-header-line-format' for available components."
                   right)
         left))))
 
+(defun pimacs--set-header-line-state (state stats)
+  (setq pimacs--header-line-state
+        (plist-put state :sessionStats stats))
+  (force-mode-line-update))
+
 (defun pimacs--update-header-line ()
-  "Update the state used by the header line."
   (let* ((state-result nil)
          (stats-result nil)
          (try-update
           (lambda ()
             (when (and state-result stats-result)
-              (setq pimacs--header-line-state
-                    (plist-put state-result :sessionStats stats-result))
-              (force-mode-line-update)))))
+              (pimacs--set-header-line-state state-result stats-result)))))
     (pimacs--send-command
      "get_state" '()
      (lambda (resp)
@@ -306,6 +313,14 @@ See `pimacs-header-line-format' for available components."
          (funcall try-update))))))
 
 (timeout-debounce 'pimacs--update-header-line 1)
+
+(defun pimacs--force-update-header-line ()
+  (let ((state-response (pimacs--send-command-sync "get_state" '()))
+        (stats-response (pimacs--send-command-sync "get_session_stats" '())))
+    (when (and (pimacs--response-success-p state-response)
+               (pimacs--response-success-p stats-response))
+      (pimacs--set-header-line-state (plist-get state-response :data)
+                                     (plist-get stats-response :data)))))
 
 (provide 'pimacs-state-line)
 ;;; pimacs-state-line.el ends here

@@ -79,26 +79,11 @@
        ,@body
        (pimacs-drain-process-output)
        (pimacs--with-chat-buffer
-         (let* ((tape-file (expand-file-name (concat ,scenario ".txt") pimacs-tape-directory))
-                (current-text (pimacs-normalize-buffer-text (buffer-substring (point-min) (point-max))))
-                (fixture-mode (pimacs-fixture-mode)))
-           (if (or (not (file-exists-p tape-file))
-                   (string= fixture-mode "record"))
-               (write-region current-text nil tape-file nil 'silent)
-             (let ((expected (pimacs-normalize-buffer-text
-                              (with-temp-buffer
-                                (insert-file-contents tape-file)
-                                (buffer-string)))))
-               (unless (string= current-text expected)
-                 (let ((temp-file (make-temp-file "pimacs-tape-")))
-                   (unwind-protect
-                       (progn
-                         (write-region current-text nil temp-file nil 'silent)
-                         (with-temp-buffer
-                           (call-process "diff" nil (current-buffer) nil "-u" tape-file temp-file)
-                           (message "Tape mismatch for %s:\n%s" ,scenario (buffer-string))
-                           (ert-fail (format "Tape mismatch for %s" ,scenario))))
-                     (delete-file temp-file))))))))
+         (pimacs--force-update-header-line)
+         (pimacs-check-tape ,scenario ".txt"
+                            (buffer-substring (point-min) (point-max)))
+         (pimacs-check-tape ,scenario "-header.txt"
+                            (pimacs--format-state-line pimacs-header-line-format)))
 
        (pimacs-quit-chat))))
 
@@ -137,6 +122,28 @@
          (replace-regexp-in-string "\\b[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}" "UUID")
          (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}T[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{3\\}Z" "TIMESTAMP"))))
 
+(defun pimacs-check-tape (scenario suffix text)
+  (let* ((tape-file (expand-file-name (concat scenario suffix) pimacs-tape-directory))
+         (current-text (pimacs-normalize-buffer-text text))
+         (fixture-mode (pimacs-fixture-mode)))
+    (if (or (not (file-exists-p tape-file))
+            (string= fixture-mode "record"))
+        (write-region current-text nil tape-file nil 'silent)
+      (let ((expected (pimacs-normalize-buffer-text
+                       (with-temp-buffer
+                         (insert-file-contents tape-file)
+                         (buffer-string)))))
+        (unless (string= current-text expected)
+          (let ((temp-file (make-temp-file "pimacs-tape-")))
+            (unwind-protect
+                (progn
+                  (write-region current-text nil temp-file nil 'silent)
+                  (with-temp-buffer
+                    (call-process "diff" nil (current-buffer) nil "-u" tape-file temp-file)
+                    (message "Tape mismatch for %s:\n%s" scenario (buffer-string))
+                    (ert-fail (format "Tape mismatch for %s" scenario))))
+              (delete-file temp-file))))))))
+
 (defun pimacs-send-prompt-and-wait (prompt)
   (pimacs-send-prompt prompt)
   (pimacs-drain-process-output))
@@ -165,6 +172,12 @@
 
 (ert-deftest pimacs-slash ()
   (pimacs-with-integration-project "slash"
+    (setq-local pimacs-header-line-format
+                '("model=" :model
+                  " tools=" (lambda (state)
+                               (format "%s" (pimacs--plist-get state :sessionStats :toolCalls)))
+                  :spacer
+                  "provider=" :provider))
     (pimacs-send-prompt-and-wait "/new")
     (pimacs-send-prompt-and-wait "/name session1")
     (pimacs-send-prompt-and-wait "/session")
@@ -190,6 +203,11 @@
 
 (ert-deftest pimacs-session ()
   (pimacs-with-integration-project "session"
+    (setq-local pimacs-header-line-format
+                '("session=" :session_name
+                  " messages=" :message_count "/" :pending_message_count
+                  :spacer
+                  "total=" :total_messages))
     (pimacs-send-prompt-and-wait "/new")
     (pimacs-send-prompt-and-wait "/name test-session")
     (pimacs-send-prompt-and-wait "/session")
@@ -198,6 +216,11 @@
 
 (ert-deftest pimacs-clone ()
   (pimacs-with-integration-project "clone"
+    (setq-local pimacs-header-line-format
+                '("tokens=" :input_tokens "/" :output_tokens
+                  " cache=" :cache_read_tokens "/" :cache_write_tokens
+                  :spacer
+                  "cost=" :cost))
     (pimacs-send-prompt-and-wait "/name clone-test")
     (pimacs-send-prompt-and-wait "say hello")
     (pimacs-send-prompt-and-wait "tell me a story, 100 words")
@@ -209,6 +232,10 @@
 
 (ert-deftest pimacs-fork ()
   (pimacs-with-integration-project "fork"
+    (setq-local pimacs-header-line-format
+                '("context=" :context_tokens "/" :context_window
+                  :spacer
+                  "tools=" :tool_calls "/" :tool_results))
     (pimacs-send-prompt-and-wait "hello")
     (pimacs-send-prompt-and-wait "hello again")
     (pimacs-with-minibuffer-input "hello again"
@@ -217,6 +244,11 @@
 
 (ert-deftest pimacs-resume ()
   (pimacs-with-integration-project "resume"
+    (setq-local pimacs-header-line-format
+                '("users=" :user_messages
+                  " assistants=" :assistant_messages
+                  :spacer
+                  "total=" :total_messages))
     (pimacs-send-prompt-and-wait "/name sessionv1")
     (pimacs-send-prompt-and-wait "h1")
     (pimacs-send-prompt-and-wait "h2")
@@ -229,6 +261,8 @@
 
 (ert-deftest pimacs-compact ()
   (pimacs-with-integration-project "compact"
+    (setq-local pimacs-header-line-format
+                '("tokens=" :total_tokens " model=" :model))
     (pimacs-send-prompt-and-wait "hello")
     (pimacs-send-prompt-and-wait "tell me a story, 100 words")
     (pimacs-send-prompt-and-wait "/compact")
@@ -236,6 +270,10 @@
 
 (ert-deftest pimacs-followup ()
   (pimacs-with-integration-project "followup"
+    (setq-local pimacs-header-line-format
+                '(:spacer
+                  "agent=" :agent_state
+                  " thinking=" :thinking_level))
     (pimacs-send-prompt "hello")
     (pimacs-send-prompt "follow up 1")
     (pimacs-send-prompt "follow up 2")
@@ -244,6 +282,10 @@
 
 (ert-deftest pimacs-steer ()
   (pimacs-with-integration-project "steer"
+    (setq-local pimacs-header-line-format
+                '("provider=" :provider
+                  :spacer
+                  "thinking=" :thinking_level))
     (pimacs-send-prompt "hello")
     (pimacs-send-prompt-alternate "hello 1")
     (pimacs-send-prompt-alternate "hello 2")
@@ -252,6 +294,10 @@
 
 (ert-deftest pimacs-send-region ()
   (pimacs-with-integration-project "insert-region"
+    (setq-local pimacs-header-line-format
+                '("messages=" :message_count
+                  :spacer
+                  "pending=" :pending_message_count))
     (pimacs-send-prompt-and-wait "say hello")
     (with-temp-buffer
       (insert "hello again")
@@ -262,6 +308,10 @@
 
 (ert-deftest pimacs-reload ()
   (pimacs-with-integration-project "reload"
+    (setq-local pimacs-header-line-format
+                '("ctx=" :context_usage
+                  :spacer
+                  "compaction=" :compaction_mode))
     (pimacs-send-prompt-and-wait "hello")
     (pimacs-send-prompt "/reload")
     (sleep-for 3)
@@ -270,6 +320,10 @@
 
 (ert-deftest pimacs-extension-ui ()
   (pimacs-with-integration-project "extension-ui"
+    (setq-local pimacs-header-line-format
+                '("cost=" :cost
+                  :spacer
+                  "model=" (:model face font-lock-function-name-face)))
     (pimacs-send-prompt-and-wait "/rpc-notify")
 
     (pimacs-with-minibuffer-input "test value"
