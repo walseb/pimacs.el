@@ -434,6 +434,47 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      File to write RPC JSON log entries to.
 
+ -- User Option: pimacs-header-line-format '(:context_usage " ("
+          :compaction_mode ")" :spacer "(" :provider ") " :model " • "
+          :thinking_level)
+
+     Format of the Pimacs chat header line.
+
+     Strings are displayed literally.  Functions are called with the
+     state plist and their returned values are displayed.  The following
+     keywords are replaced with state information.
+
+     Session state keywords: ‘:model’ Model identifier.  ‘:provider’
+     Model provider.  ‘:thinking_level’ Thinking level.
+     ‘:steering_mode’ Steering mode.  ‘:follow_up_mode’ Follow-up mode.
+     ‘:session_name’ Session name.  ‘:compaction_mode’ ‘auto’ or
+     ‘manual’.  ‘:message_count’ Message count.
+     ‘:pending_message_count’ Pending message count.
+
+     Session statistics keywords: ‘:user_messages’ User message count.
+     ‘:assistant_messages’ Assistant message count.  ‘:tool_calls’ Tool
+     call count.  ‘:tool_results’ Tool result count.  ‘:total_messages’
+     Total message count.  ‘:input_tokens’ Input token count.
+     ‘:output_tokens’ Output token count.  ‘:cache_read_tokens’
+     Cache-read token count.  ‘:cache_write_tokens’ Cache-write token
+     count.  ‘:total_tokens’ Total token count.  ‘:cost’ Session cost.
+     ‘:context_usage’ Context tokens and context window.
+     ‘:context_tokens’ Context token count.  ‘:context_window’ Context
+     window size.
+
+     UI keywords: ‘:agent_state’ Current agent state.  ‘:spinner’ Active
+     agent spinner.  ‘:spacer’ Space that right-aligns all following
+     entries.
+
+     Use at most one ‘:spacer’.
+
+ -- User Option: pimacs-mode-line-format '(" Pimacs " :agent_state
+          :spinner)
+
+     Format of the Pimacs mode-line entry.
+
+     See ‘pimacs-header-line-format’ for available components.
+
  -- User Option: pimacs-align-markdown-tables t
 
      Whether to align markdown tables while rendering assistant output.

@@ -132,31 +132,31 @@
     (pimacs-section--create-root-section)
 
     (pimacs--handle-agent-state '(:type "tool_execution_start" :toolName "read"))
-    (should (equal (pimacs--format-state) "Pimacs tool(read)"))
+    (should (equal (pimacs--format-state) "tool(read)"))
     (should (spinner--active-p pimacs--spinner))
 
     (pimacs--handle-agent-state '(:type "tool_execution_start" :toolName "grep"))
-    (should (equal (pimacs--format-state) "Pimacs tool(grep, read)"))
+    (should (equal (pimacs--format-state) "tool(grep, read)"))
     (should (spinner--active-p pimacs--spinner))
 
     (pimacs--handle-agent-state '(:type "tool_execution_start" :toolName "bash"))
-    (should (equal (pimacs--format-state) "Pimacs tool(bash, grep + 1 more)"))
+    (should (equal (pimacs--format-state) "tool(bash, grep + 1 more)"))
     (should (spinner--active-p pimacs--spinner))
 
     (pimacs--handle-agent-state '(:type "tool_execution_end" :toolName "bash"))
-    (should (equal (pimacs--format-state) "Pimacs tool(grep, read)"))
+    (should (equal (pimacs--format-state) "tool(grep, read)"))
     (should (spinner--active-p pimacs--spinner))
 
     (pimacs--handle-agent-state '(:type "tool_execution_end" :toolName "grep"))
-    (should (equal (pimacs--format-state) "Pimacs tool(read)"))
+    (should (equal (pimacs--format-state) "tool(read)"))
     (should (spinner--active-p pimacs--spinner))
 
     (pimacs--handle-agent-state '(:type "tool_execution_end" :toolName "read"))
-    (should (equal (pimacs--format-state) "Pimacs thinking"))
+    (should (equal (pimacs--format-state) "thinking"))
     (should (spinner--active-p pimacs--spinner))
 
     (pimacs--handle-agent-state '(:type "turn_end"))
-    (should (equal (pimacs--format-state) "Pimacs"))
+    (should (equal (pimacs--format-state) "idle"))
     (should-not (spinner--active-p pimacs--spinner))))
 
 (ert-deftest pimacs--handle-message-end-creates-section-without-deltas ()

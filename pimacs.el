@@ -59,6 +59,7 @@
 (require 'pimacs-utils)
 (require 'pimacs-core)
 (require 'pimacs-agent)
+(require 'pimacs-state-line)
 
 (defface pimacs-chat-role-face
   '((t :inherit font-lock-builtin-face))
@@ -339,11 +340,8 @@ with the message plist to insert the custom message content."
 (pimacs--def-permanent-buffer-local pimacs--status-widget nil)
 (pimacs--def-permanent-buffer-local pimacs--status-widget-texts nil)
 (pimacs--def-permanent-buffer-local pimacs--content-sections nil)
-(pimacs--def-permanent-buffer-local pimacs--header-line-state nil)
 (pimacs--def-permanent-buffer-local pimacs--tool-calls nil)
 (pimacs--def-permanent-buffer-local pimacs--cleanup-callback-fn nil)
-(pimacs--def-permanent-buffer-local pimacs--agent-state nil)
-(pimacs--def-permanent-buffer-local pimacs--spinner nil)
 (pimacs--def-permanent-buffer-local pimacs--retry-in-progress nil)
 (pimacs--def-permanent-buffer-local pimacs--commands nil)
 
@@ -1364,78 +1362,6 @@ with the message plist to insert the custom message content."
   (interactive)
   (goto-char (widget-field-text-end pimacs--prompt-widget)))
 
-(defun pimacs--format-tool-state (tools)
-  (pcase tools
-    (`(,first ,second ,_ . ,rest)
-     (format "%s, %s + %d more" first second (1+ (length rest))))
-    (_
-     (mapconcat #'identity tools ", "))))
-
-(defun pimacs--format-state ()
-  (if pimacs--agent-state
-      (let ((state pimacs--agent-state))
-        (if (consp state)
-            (format "Pimacs %s(%s)"
-                    (car state)
-                    (pimacs--format-tool-state (cdr state)))
-          (format "Pimacs %s" state)))
-    "Pimacs"))
-
-(defun pimacs--format-header ()
-  "Format the header line from `pimacs--header-line-state'.
-Shows context usage and model info."
-  (let* ((model (plist-get pimacs--header-line-state :model))
-         (provider (plist-get model :provider))
-         (model-id (plist-get model :id))
-         (thinking-level (plist-get pimacs--header-line-state :thinkingLevel))
-         (auto-compact (plist-get pimacs--header-line-state :autoCompactionEnabled))
-         (session-stats (plist-get pimacs--header-line-state :sessionStats))
-         (context-usage (plist-get session-stats :contextUsage))
-         (ctx-tokens (plist-get context-usage :tokens))
-         (ctx-window-usage (plist-get context-usage :contextWindow))
-         (ctx-str (pimacs--format-number-short ctx-window-usage))
-         (usage-str (pimacs--format-number-short ctx-tokens)))
-    (let* ((left (format "%s/%s (%s)"
-                         usage-str ctx-str
-                         (if auto-compact "auto" "manual")))
-           (right (format "(%s) %s • %s"
-                          (or provider "?")
-                          (or model-id "?")
-                          (or thinking-level "?"))))
-      (format "%s%s%s"
-              left
-              (make-string (max 1 (- (window-width) (length left) (length right))) ?\s)
-              right))))
-
-(defun pimacs--format-mode-line ()
-  (let ((spinner-str (and pimacs--agent-state (spinner-print pimacs--spinner)))
-        (state-str (pimacs--format-state)))
-    (if spinner-str
-        (format " %s %s" state-str spinner-str)
-      (format " %s" state-str))))
-
-(defun pimacs--update-header-line ()
-  (let* ((state-result nil)
-         (stats-result nil)
-         (try-update
-          (lambda ()
-            (when (and state-result stats-result)
-              (setq pimacs--header-line-state
-                    (plist-put state-result :sessionStats stats-result))
-              (force-mode-line-update)))))
-    (pimacs--send-command
-     "get_state" '()
-     (pimacs--on-response-success-callback resp
-       (setq state-result (plist-get resp :data))
-       (funcall try-update)))
-    (pimacs--send-command
-     "get_session_stats" '()
-     (pimacs--on-response-success-callback resp
-       (setq stats-result (plist-get resp :data))
-       (funcall try-update)))))
-
-(timeout-debounce 'pimacs--update-header-line 1)
-
 (defun pimacs--update-agent-state (state)
   (setq pimacs--agent-state state)
   (setq imenu--index-alist nil)
@@ -2416,7 +2342,8 @@ With a prefix argument OTHER-WINDOW, visit in other window."
 
 \\{pimacs-chat-mode-map}"
   (buffer-disable-undo)
-  (setq header-line-format '(:eval (pimacs--format-header)))
+  (setq header-line-format
+        '(:eval (pimacs--format-state-line pimacs-header-line-format)))
   (setq pimacs--tool-calls (make-hash-table :test 'equal))
   (setq pimacs--content-sections (make-hash-table :test 'eql))
   (pimacs-section--create-root-section)
@@ -2453,7 +2380,7 @@ With a prefix argument OTHER-WINDOW, visit in other window."
   (pimacs--register-agent-cleanup)
   (pimacs--register-event-listeners)
   (setq-local mode-line-misc-info
-              (append (list '(:eval (pimacs--format-mode-line)))
+              (append (list '(:eval (pimacs--format-state-line pimacs-mode-line-format)))
                       mode-line-misc-info))
   (pimacs--update-header-line)
   (pimacs--fetch-commands))

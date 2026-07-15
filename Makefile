@@ -18,7 +18,7 @@ setup: cask
 .PHONY: compile
 compile: cask
 	@cask emacs -batch -L . -L test \
-	  -f batch-byte-compile pimacs-utils.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el; \
+	  -f batch-byte-compile pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el; \
 	  (ret=$$? ; cask clean-elc && exit $$ret)
 
 .PHONY: package-lint
@@ -26,7 +26,7 @@ package-lint: cask
 	@cask emacs -Q --batch \
 	  --eval "(setq package-lint-main-file \"pimacs.el\")" \
 	  -f package-lint-batch-and-exit \
-	  pimacs-utils.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el
+	  pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el
 
 .PHONY: test
 test: compile
@@ -43,7 +43,7 @@ coverage: test integration
 
 .PHONY: format
 format:
-	@cask emacs --batch -L . -l pimacs-utils.el -l pimacs-core.el -l pimacs.el -l pimacs-section.el -l pimacs-edit.el -l pimacs-agent.el -l pimacs-tests.el -l pimacs-section-tests.el -l integration/pimacs-integration-tests.el \
+	@cask emacs --batch -L . -l pimacs-utils.el -l pimacs-state-line.el -l pimacs-core.el -l pimacs.el -l pimacs-section.el -l pimacs-edit.el -l pimacs-agent.el -l pimacs-tests.el -l pimacs-section-tests.el -l integration/pimacs-integration-tests.el \
 	  --eval " \
 	  (let ((inhibit-message t) \
                 (message-log-max nil)) \
@@ -52,7 +52,7 @@ format:
 	      (with-current-buffer (find-file-noselect f) \
 	        (indent-region (point-min) (point-max)) \
 	        (save-buffer))))" \
-          pimacs-utils.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el pimacs-tests.el pimacs-section-tests.el integration/pimacs-integration-tests.el
+          pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el pimacs-tests.el pimacs-section-tests.el integration/pimacs-integration-tests.el
 
 
 .PHONY: sandbox
@@ -75,6 +75,7 @@ define ESCRIPT
   (require 'subr-x)
   (insert-file-contents "pimacs-section.el")
   (insert-file-contents "pimacs-utils.el")
+  (insert-file-contents "pimacs-state-line.el")
   (insert-file-contents "pimacs-core.el")
   (insert-file-contents "pimacs-agent.el")
   (insert-file-contents "pimacs.el")
@@ -123,6 +124,7 @@ docs-lint:
 	  --eval "(checkdoc-file \"pimacs.el\")" \
 	  --eval "(checkdoc-file \"pimacs-section.el\")" \
 	  --eval "(checkdoc-file \"pimacs-utils.el\")" \
+	  --eval "(checkdoc-file \"pimacs-state-line.el\")" \
 	  --eval "(checkdoc-file \"pimacs-edit.el\")" \
 	  --eval "(checkdoc-file \"pimacs-agent.el\")" \
 	  --eval "(checkdoc-file \"pimacs-core.el\")" 2>&1 | grep '^pimacs[.-]' | grep -v 'All variables and subroutines might as well have a documentation string' || true

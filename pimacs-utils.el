@@ -237,5 +237,13 @@ PRED is called with KEY VALUE."
     (set-buffer-modified-p nil)
     (buffer-string)))
 
+(defun pimacs--plist-get (list &rest args)
+  (cl-reduce
+   (lambda (object key)
+     (when object
+       (plist-get object key)))
+   args
+   :initial-value list))
+
 (provide 'pimacs-utils)
 ;;; pimacs-utils.el ends here
