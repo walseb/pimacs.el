@@ -122,6 +122,14 @@
          (replace-regexp-in-string "\\b[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}" "UUID")
          (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}T[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{3\\}Z" "TIMESTAMP"))))
 
+(defun pimacs--force-update-header-line ()
+  (let ((state-response (pimacs--send-command-sync "get_state" '()))
+        (stats-response (pimacs--send-command-sync "get_session_stats" '())))
+    (when (and (pimacs--response-success-p state-response)
+               (pimacs--response-success-p stats-response))
+      (pimacs--set-header-line-state (plist-get state-response :data)
+                                     (plist-get stats-response :data)))))
+
 (defun pimacs-check-tape (scenario suffix text)
   (let* ((tape-file (expand-file-name (concat scenario suffix) pimacs-tape-directory))
          (current-text (pimacs-normalize-buffer-text text))

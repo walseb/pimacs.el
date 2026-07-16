@@ -316,13 +316,5 @@ See `pimacs-header-line-format' for available components."
 
 (timeout-debounce 'pimacs--update-header-line 1)
 
-(defun pimacs--force-update-header-line ()
-  (let ((state-response (pimacs--send-command-sync "get_state" '()))
-        (stats-response (pimacs--send-command-sync "get_session_stats" '())))
-    (when (and (pimacs--response-success-p state-response)
-               (pimacs--response-success-p stats-response))
-      (pimacs--set-header-line-state (plist-get state-response :data)
-                                     (plist-get stats-response :data)))))
-
 (provide 'pimacs-state-line)
 ;;; pimacs-state-line.el ends here
