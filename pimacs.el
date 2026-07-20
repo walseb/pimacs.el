@@ -389,25 +389,13 @@ with the message plist to insert the custom message content."
       (format "*pimacs-chat:%s:%s*" (pimacs--project-name) title)
     (format "*pimacs-chat:%s*" (pimacs--project-name))))
 
-(defun pimacs--recenter-chat ()
-  (when-let (window (get-buffer-window (current-buffer) t))
-    (with-selected-window window
-      (recenter (- -1 scroll-margin (pimacs--widget-lines pimacs--prompt-widget) (pimacs--extra-widget-lines))))))
-
 (defmacro pimacs--widget-save-excursion (&rest body)
-  "Insert before PROMPT-WIDGET and restore focus.  BODY is the content."
+  "Insert before PROMPT-WIDGET without moving point.  BODY is the content."
   (declare (indent 0))
-  `(let* ((inhibit-read-only t)
-          (window (get-buffer-window (current-buffer) t))
-          (follow-p
-           (and window
-                (>= (window-point window)
-                    (widget-get pimacs--prompt-widget :from)))))
+  `(let ((inhibit-read-only t))
      (save-excursion
        (goto-char (widget-get pimacs--prompt-widget :from))
-       ,@body)
-     (when follow-p
-       (pimacs--recenter-chat))))
+       ,@body)))
 
 (defmacro pimacs--with-chat-buffer (&rest body)
   "Execute BODY in the current chat buffer."
@@ -1457,8 +1445,7 @@ with the message plist to insert the custom message content."
   (pimacs--update-header-line))
 
 (defun pimacs--autohide-sections ()
-  (pimacs-section-autohide)
-  (pimacs--recenter-chat))
+  (pimacs-section-autohide))
 
 (defun pimacs--cleanup-chat-buffer ()
   (let ((project-key pimacs--project-key))
@@ -2480,7 +2467,7 @@ With a prefix argument OTHER-WINDOW, visit in other window."
                                  (when name
                                    (pimacs-set-session-name name)))
                                buffer))))
-        (pop-to-buffer chat-buffer)))))
+        (pop-to-buffer chat-buffer '(display-buffer-pop-up-window))))))
 
 ;;;###autoload
 (defun pimacs-chat (&optional name root)
