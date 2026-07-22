@@ -1402,7 +1402,7 @@ with the message plist to insert the custom message content."
 (defun pimacs--handle-set-title (event)
   (let ((title (plist-get event :title)))
     (when title
-      (rename-buffer (pimacs--chat-buffer-name title) t))))
+      nil)))
 
 (defun pimacs--handle-extension-ui-request (event)
   (pcase (plist-get event :method)
@@ -2161,7 +2161,6 @@ CALLBACK is called after a successful refresh."
         (pimacs--send-command
          "set_session_name" (list :name trimmed)
          (pimacs--on-response-success-callback resp
-           (rename-buffer (pimacs--chat-buffer-name trimmed) t)
            (pimacs--update-header-line)
            (pimacs--widget-save-excursion
              (pimacs--insert-session-info trimmed))))))))
