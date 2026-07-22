@@ -4,6 +4,10 @@
 
 ### Added
 
+- `pimacs-list-sessions` displays active chats in a sortable tabulated list.
+  Its columns and initial sort order are configurable with
+  `pimacs-list-sessions-table` and `pimacs-list-sessions-sort-key`.
+- The `:project_root` state-line component displays the project root directory.
 - `pimacs-switch-session` switches between active chats.
 - Send commands select an active chat by enclosing project root, prompting when ambiguous.
 - Start chats from any directory using the `C-u` prefix for `pimacs-chat`,

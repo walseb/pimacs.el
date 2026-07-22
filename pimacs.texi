@@ -401,6 +401,33 @@ Maximum number of prompt history entries to keep.
 Maximum number of recent sessions to list when resuming a session.
 @end defopt
 
+@defopt pimacs-list-sessions-table
+
+@lisp
+'(("Session" . (:session_name face font-lock-function-name-face))
+  ("Provider" . :provider)
+  ("Model" . :model)
+  ("State" . (:agent_state face font-lock-keyword-face))
+  ("Context" . (:context_usage face shadow))
+  ("Messages" . :total_messages)
+  ("Cost" . (:cost face shadow))
+  ("Project" . (:project_root face shadow)))
+@end lisp
+
+Columns displayed by @code{pimacs-list-sessions}.
+
+Each entry is (HEADER . COMPONENT).  COMPONENT uses the same format as an
+entry in @code{pimacs-header-line-format}.
+@end defopt
+
+@defopt pimacs-list-sessions-sort-key @code{'("Session" . nil)}
+
+Initial sort order for @code{pimacs-list-sessions}.
+
+The car is a header from @code{pimacs-list-sessions-table}.  A non-nil cdr sorts
+in descending order.
+@end defopt
+
 @defopt pimacs-prompt-streaming-behavior @code{'followUp}
 
 Default streaming behavior for prompts.
@@ -573,6 +600,7 @@ Session state keywords:
 @code{:provider}                 Model provider.
 @code{:thinking_level}           Thinking level.
 @code{:session_name}             Session name.
+@code{:project_root}             Project root directory.
 @code{:compaction_mode}          @code{auto} or @code{manual}.
 @code{:message_count}            Message count.
 @code{:pending_message_count}    Pending message count.

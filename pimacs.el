@@ -49,6 +49,7 @@
 (require 'seq)
 (require 'mailcap)
 (require 'transient)
+(require 'tabulated-list)
 
 (defgroup pimacs nil
   "Emacs client for Pi."
@@ -149,6 +150,33 @@
 (defcustom pimacs-resume-max-sessions 100
   "Maximum number of recent sessions to list when resuming a session."
   :type 'integer
+  :group 'pimacs)
+
+(defcustom pimacs-list-sessions-table
+  '(("Session" . (:session_name face font-lock-function-name-face))
+    ("Provider" . :provider)
+    ("Model" . :model)
+    ("State" . (:agent_state face font-lock-keyword-face))
+    ("Context" . (:context_usage face shadow))
+    ("Messages" . :total_messages)
+    ("Cost" . (:cost face shadow))
+    ("Project" . (:project_root face shadow)))
+  "Columns displayed by `pimacs-list-sessions'.
+
+Each entry is (HEADER . COMPONENT).  COMPONENT uses the same format as an
+entry in `pimacs-header-line-format'."
+  :type `(repeat
+          (cons (string :tag "Header")
+                ,(cadr pimacs--state-line-format-type)))
+  :group 'pimacs)
+
+(defcustom pimacs-list-sessions-sort-key '("Session" . nil)
+  "Initial sort order for `pimacs-list-sessions'.
+
+The car is a header from `pimacs-list-sessions-table'.  A non-nil cdr sorts
+in descending order."
+  :type '(cons (string :tag "Column")
+               (boolean :tag "Descending"))
   :group 'pimacs)
 
 (defcustom pimacs-prompt-streaming-behavior 'followUp
@@ -2510,6 +2538,67 @@ With a prefix argument, show a transient for setting NAME and ROOT."
   (if current-prefix-arg
       (pimacs-chat--transient)
     (pimacs-chat--create name root)))
+
+(defvar-keymap pimacs-list-sessions-mode-map
+  :doc "Keymap for `pimacs-list-sessions-mode'."
+  :parent tabulated-list-mode-map
+  "RET" #'pimacs-list-sessions-visit
+  "g" #'pimacs-list-sessions-refresh)
+
+(define-derived-mode pimacs-list-sessions-mode tabulated-list-mode "Pimacs Sessions"
+  "Major mode for listing active Pimacs sessions."
+  (setq tabulated-list-padding 0
+        tabulated-list-sort-key (copy-tree pimacs-list-sessions-sort-key)))
+
+(defun pimacs--list-sessions-entries ()
+  (mapcar
+   (lambda (candidate)
+     (with-current-buffer (cdr candidate)
+       (list candidate
+             (vconcat
+              (mapcar
+               (lambda (column)
+                 (pimacs--format-state-line-component
+                  (pimacs--state-line-state) (cdr column)))
+               pimacs-list-sessions-table)))))
+   (pimacs--active-chat-candidates)))
+
+(defun pimacs--list-sessions-format (entries)
+  (vconcat
+   (cl-loop for column in pimacs-list-sessions-table
+            for index from 0
+            collect
+            (list (car column)
+                  (max (+ 2 (string-width (car column)))
+                       (or (cl-loop for entry in entries
+                                    maximize (string-width
+                                              (aref (cadr entry) index)))
+                           0))
+                  t))))
+
+(defun pimacs-list-sessions-refresh ()
+  "Refresh the Pimacs sessions list."
+  (interactive)
+  (let ((entries (pimacs--list-sessions-entries)))
+    (setq tabulated-list-format (pimacs--list-sessions-format entries)
+          tabulated-list-entries entries)
+    (tabulated-list-init-header)
+    (tabulated-list-print t)))
+
+(defun pimacs-list-sessions-visit ()
+  "Visit the Pimacs session on the current line."
+  (interactive)
+  (when-let ((candidate (tabulated-list-get-id)))
+    (pop-to-buffer (cdr candidate))))
+
+(defun pimacs-list-sessions ()
+  "List active Pimacs sessions in a tabulated buffer."
+  (interactive)
+  (let ((buffer (get-buffer-create "*Pimacs Sessions*")))
+    (with-current-buffer buffer
+      (pimacs-list-sessions-mode)
+      (pimacs-list-sessions-refresh))
+    (pop-to-buffer buffer)))
 
 (defun pimacs-switch-session ()
   "Switch to another active Pimacs chat session."
