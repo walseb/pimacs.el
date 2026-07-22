@@ -36,6 +36,7 @@
                    (const :tag "Provider" :provider)
                    (const :tag "Thinking level" :thinking_level)
                    (const :tag "Session name" :session_name)
+                   (const :tag "Project root" :project_root)
                    (const :tag "Compaction mode" :compaction_mode)
                    (const :tag "Message count" :message_count)
                    (const :tag "Pending message count" :pending_message_count)
@@ -74,6 +75,7 @@ Session state keywords:
 `:provider'                 Model provider.
 `:thinking_level'           Thinking level.
 `:session_name'             Session name.
+`:project_root'             Project root directory.
 `:compaction_mode'          `auto' or `manual'.
 `:message_count'            Message count.
 `:pending_message_count'    Pending message count.
@@ -136,7 +138,8 @@ See `pimacs-header-line-format' for available components."
 
 (defun pimacs--state-line-state ()
   (append (list :spinner pimacs--spinner
-                :agent-state pimacs--agent-state)
+                :agentState pimacs--agent-state
+                :projectRoot pimacs--project-root)
           pimacs--header-line-state))
 
 (defun pimacs--format-state-line-value (value)
@@ -154,7 +157,14 @@ See `pimacs-header-line-format' for available components."
   (pimacs--format-state-line-value (plist-get state :thinkingLevel)))
 
 (defun pimacs--format-state-line-session-name (state)
-  (pimacs--format-state-line-value (plist-get state :sessionName)))
+  (let ((name (plist-get state :sessionName)))
+    (pimacs--format-state-line-value
+     (if (and (stringp name) (not (string-empty-p name)))
+         name
+       (pimacs--short-uuid (pimacs--plist-get state :sessionStats :sessionId))))))
+
+(defun pimacs--format-state-line-project-root (state)
+  (pimacs--format-state-line-value (plist-get state :projectRoot)))
 
 (defun pimacs--format-state-line-message-count (state)
   (pimacs--format-state-line-value (plist-get state :messageCount)))
@@ -211,15 +221,20 @@ See `pimacs-header-line-format' for available components."
   (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :tokens :total)))
 
 (defun pimacs--format-state-line-cost (state)
-  (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :cost)))
+  (let ((cost (pimacs--plist-get state :sessionStats :cost)))
+    (if (numberp cost)
+        (string-trim-right
+         (string-trim-right (format "%.6f" cost) "0+")
+         "[.]")
+      (pimacs--format-state-line-value cost))))
 
 (defun pimacs--format-state-line-agent-state (state)
-  (pimacs--format-agent-state (plist-get state :agent-state)))
+  (pimacs--format-agent-state (plist-get state :agentState)))
 
 (defun pimacs--format-state-line-spinner (state)
   "Return the spinner from STATE, prefixed with a space when active."
   (if-let ((spinner (plist-get state :spinner))
-           (spinner-str (and (plist-get state :agent-state)
+           (spinner-str (and (plist-get state :agentState)
                              (spinner-print spinner))))
       (concat " " spinner-str)
     ""))
@@ -229,6 +244,7 @@ See `pimacs-header-line-format' for available components."
     (:provider . pimacs--format-state-line-provider)
     (:thinking_level . pimacs--format-state-line-thinking-level)
     (:session_name . pimacs--format-state-line-session-name)
+    (:project_root . pimacs--format-state-line-project-root)
     (:compaction_mode . pimacs--format-state-line-compaction-mode)
     (:message_count . pimacs--format-state-line-message-count)
     (:pending_message_count . pimacs--format-state-line-pending-message-count)

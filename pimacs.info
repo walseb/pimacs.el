@@ -83,7 +83,8 @@ Run ‘M-x pimacs-chat’ from any file in your project to start a Pimacs
 chat session.  Use a prefix argument (‘C-u M-x pimacs-chat’) to open a
 transient where you can set a session name and root directory.  Setting
 a root directory starts the chat there instead of using ‘project.el’ to
-find the project root.
+find the project root.  Run ‘M-x pimacs-switch-session’ to switch
+between any active chat sessions.
 
    The chat buffer is read-only except for the prompt input area.  Use
 ‘RET’ to submit a prompt and ‘C-j’ to insert a newline.  Press ‘i’ from
@@ -321,6 +322,29 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      Maximum number of recent sessions to list when resuming a session.
 
+ -- User Option: pimacs-list-sessions-table
+
+          '(("Session" . (:session_name face font-lock-function-name-face))
+            ("Provider" . :provider)
+            ("Model" . :model)
+            ("State" . (:agent_state face font-lock-keyword-face))
+            ("Context" . (:context_usage face shadow))
+            ("Messages" . :total_messages)
+            ("Cost" . (:cost face shadow))
+            ("Project" . (:project_root face shadow)))
+
+     Columns displayed by ‘pimacs-list-sessions’.
+
+     Each entry is (HEADER .  COMPONENT). COMPONENT uses the same format
+     as an entry in ‘pimacs-header-line-format’.
+
+ -- User Option: pimacs-list-sessions-sort-key '("Session" . nil)
+
+     Initial sort order for ‘pimacs-list-sessions’.
+
+     The car is a header from ‘pimacs-list-sessions-table’.  A non-nil
+     cdr sorts in descending order.
+
  -- User Option: pimacs-prompt-streaming-behavior 'followUp
 
      Default streaming behavior for prompts.
@@ -471,9 +495,9 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      Session state keywords: ‘:model’ Model identifier.  ‘:provider’
      Model provider.  ‘:thinking_level’ Thinking level.  ‘:session_name’
-     Session name.  ‘:compaction_mode’ ‘auto’ or ‘manual’.
-     ‘:message_count’ Message count.  ‘:pending_message_count’ Pending
-     message count.
+     Session name.  ‘:project_root’ Project root directory.
+     ‘:compaction_mode’ ‘auto’ or ‘manual’.  ‘:message_count’ Message
+     count.  ‘:pending_message_count’ Pending message count.
 
      Session statistics keywords: ‘:user_messages’ User message count.
      ‘:assistant_messages’ Assistant message count.  ‘:tool_calls’ Tool
@@ -530,16 +554,16 @@ Node: Top746
 Node: Introduction1012
 Node: Setup1269
 Node: Usage1872
-Node: Slash Commands2619
-Node: File Name Completion4860
-Node: Bash5188
-Node: Sending Context5455
-Node: Images6263
-Node: State Lines7128
-Node: Sandbox7816
-Node: How It Works8198
-Node: Keybindings8648
-Node: Custom Variables10806
+Node: Slash Commands2700
+Node: File Name Completion4941
+Node: Bash5269
+Node: Sending Context5536
+Node: Images6344
+Node: State Lines7209
+Node: Sandbox7897
+Node: How It Works8279
+Node: Keybindings8729
+Node: Custom Variables10887
 
 End Tag Table
 

@@ -119,6 +119,10 @@
     (->> text
          (replace-regexp-in-string (regexp-quote pimacs-project-directory) "PROJECT_DIR")
          (replace-regexp-in-string (regexp-quote session_dir) "SESSION_DIR")
+         (replace-regexp-in-string
+          (concat (regexp-quote (file-name-as-directory temporary-file-directory))
+                  "pimacs-parent-[^/]+/")
+          "PARENT_DIR/")
          (replace-regexp-in-string "\\b[0-9a-f]\\{8\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{4\\}-[0-9a-f]\\{12\\}" "UUID")
          (replace-regexp-in-string "[0-9]\\{4\\}-[0-9]\\{2\\}-[0-9]\\{2\\}T[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{2\\}-[0-9]\\{3\\}Z" "TIMESTAMP"))))
 
@@ -334,7 +338,7 @@
             (list "--tools" "read,bash,edit,write,grep,find,ls"
                   "--extension" (expand-file-name "fixture" pimacs-integration-directory)))
            (pimacs-send-pop-to-chat nil)
-           parent-chat child-chat child-source parent-source outside-source)
+           parent-chat child-chat child-source parent-source outside-source sessions-list)
       (unwind-protect
           (progn
             (make-directory child-root)
@@ -353,10 +357,19 @@
             (with-current-buffer child-chat
               (pimacs--force-update-header-line))
 
+            (pimacs-list-sessions)
+            (setq sessions-list (get-buffer "*Pimacs Sessions*"))
+            (with-current-buffer sessions-list
+              (should (eq major-mode 'pimacs-list-sessions-mode))
+              (pimacs-check-tape "send-selects-enclosing-chat-sessions" ".txt"
+                                 (buffer-substring (point-min) (point-max)))
+              (pimacs-check-tape "send-selects-enclosing-chat-sessions" "-header.txt"
+                                 (substring-no-properties (nth 2 header-line-format))))
+
             (setq child-source (find-file-noselect child-file))
             (with-current-buffer child-source
               (setq-local pimacs--project-key nil)
-              (pimacs-with-minibuffer-input (kbd "child TAB RET")
+              (pimacs-with-minibuffer-input (kbd "child RET")
                 (pimacs-send-filename))
               (should (eq pimacs--project-key
                           (buffer-local-value 'pimacs--project-key child-chat)))
@@ -383,6 +396,8 @@
         (dolist (source (list child-source parent-source outside-source))
           (when (buffer-live-p source)
             (kill-buffer source)))
+        (when (buffer-live-p sessions-list)
+          (kill-buffer sessions-list))
         (dolist (chat (list child-chat parent-chat))
           (when (buffer-live-p chat)
             (with-current-buffer chat
