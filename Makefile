@@ -143,3 +143,25 @@ pimacs.info: Makefile pimacs.texi $(PIMACS_DOC_SOURCES)
 
 docs/index.html: pimacs.info
 	@makeinfo -D 'VERSION $(PIMACS_VERSION)' --no-number-sections --html --no-split -o $@ pimacs.texi
+
+define run-verify-task
+	@printf '%s\n' 'make $(1)'
+	@$(MAKE) --no-print-directory --silent $(1)
+endef
+
+.PHONY: verify
+verify:
+	$(call run-verify-task,format)
+	$(call run-verify-task,test)
+	$(call run-verify-task,docs)
+	$(call run-verify-task,docs-lint)
+	$(call run-verify-task,package-lint)
+
+.PHONY: verify-full
+verify-full:
+	$(call run-verify-task,format)
+	$(call run-verify-task,test)
+	$(call run-verify-task,docs)
+	$(call run-verify-task,integration)
+	$(call run-verify-task,docs-lint)
+	$(call run-verify-task,package-lint)
