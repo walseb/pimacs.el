@@ -1,7 +1,7 @@
 \input texinfo   @c -*-texinfo-*-
 @c %**start of header
 @setfilename pimacs.info
-@settitle Pimacs User Manual
+@settitle Pimacs User Manual @value{VERSION}
 @c %**end of header
 
 @copying
@@ -57,7 +57,7 @@ hljs.highlightAll();
 @end direntry
 
 @node Top
-@top Pimacs User Manual
+@top Pimacs User Manual @value{VERSION}
 
 Pimacs is an Emacs client for Pi Coding Agent.
 
@@ -129,6 +129,7 @@ input area.
 * Sending Context::
 * Images::
 * State Lines::
+* Managing Sessions::
 @end menu
 
 @node Slash Commands
@@ -284,6 +285,18 @@ defcustoms.  Both accept strings and state components; use
 
 See @code{pimacs-header-line-format} for available components.  A
 component may also be a function that receives the current state plist.
+
+@node Managing Sessions
+@section Managing Sessions
+
+Use @code{pimacs-switch-session} to switch between active Pimacs chat
+sessions using completion.  Use @code{pimacs-list-sessions} to display all
+active chat sessions in a sortable tabulated list.  Press @kbd{RET} to visit
+the session on the current line and @kbd{g} to refresh the list.  Select a
+column header to sort by that column.
+
+Customize the list's columns and initial sort order with
+@code{pimacs-list-sessions-table} and @code{pimacs-list-sessions-sort-key}.
 
 @node Sandbox
 @chapter Sandbox

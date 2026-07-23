@@ -20,8 +20,8 @@ END-INFO-DIR-ENTRY
 
 File: pimacs.info,  Node: Top,  Next: Introduction,  Up: (dir)
 
-Pimacs User Manual
-******************
+Pimacs User Manual 0.2.0
+************************
 
 Pimacs is an Emacs client for Pi Coding Agent.
 
@@ -98,6 +98,7 @@ anywhere in the chat buffer to move point to the prompt input area.
 * Sending Context::
 * Images::
 * State Lines::
+* Managing Sessions::
 
 
 File: pimacs.info,  Node: Slash Commands,  Next: File Name Completion,  Up: Usage
@@ -213,7 +214,7 @@ chat buffer, or paste a supported image from the clipboard via
 the mouse, or place point on it and press ‘backspace’ or ‘delete’.
 
 
-File: pimacs.info,  Node: State Lines,  Prev: Images,  Up: Usage
+File: pimacs.info,  Node: State Lines,  Next: Managing Sessions,  Prev: Images,  Up: Usage
 
 3.6 State Lines
 ===============
@@ -230,6 +231,21 @@ following components.
 
    See ‘pimacs-header-line-format’ for available components.  A
 component may also be a function that receives the current state plist.
+
+
+File: pimacs.info,  Node: Managing Sessions,  Prev: State Lines,  Up: Usage
+
+3.7 Managing Sessions
+=====================
+
+Use ‘pimacs-switch-session’ to switch between active Pimacs chat
+sessions using completion.  Use ‘pimacs-list-sessions’ to display all
+active chat sessions in a sortable tabulated list.  Press ‘RET’ to visit
+the session on the current line and ‘g’ to refresh the list.  Select a
+column header to sort by that column.
+
+   Customize the list's columns and initial sort order with
+‘pimacs-list-sessions-table’ and ‘pimacs-list-sessions-sort-key’.
 
 
 File: pimacs.info,  Node: Sandbox,  Next: How It Works,  Prev: Usage,  Up: Top
@@ -551,19 +567,20 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
 Tag Table:
 Node: Top746
-Node: Introduction1012
-Node: Setup1269
-Node: Usage1872
-Node: Slash Commands2700
-Node: File Name Completion4941
-Node: Bash5269
-Node: Sending Context5536
-Node: Images6344
-Node: State Lines7209
-Node: Sandbox7897
-Node: How It Works8279
-Node: Keybindings8729
-Node: Custom Variables10887
+Node: Introduction1024
+Node: Setup1281
+Node: Usage1884
+Node: Slash Commands2734
+Node: File Name Completion4975
+Node: Bash5303
+Node: Sending Context5570
+Node: Images6378
+Node: State Lines7243
+Node: Managing Sessions7957
+Node: Sandbox8550
+Node: How It Works8932
+Node: Keybindings9382
+Node: Custom Variables11540
 
 End Tag Table
 

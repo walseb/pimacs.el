@@ -2,6 +2,9 @@ export EMACS ?= $(shell command -v emacs 2>/dev/null)
 CASK_DIR := $(shell cask package-directory)
 
 MATCH ?=
+PIMACS_VERSION := $(shell awk '/^;; Version:/ { print $$3; exit }' pimacs.el)
+PIMACS_DOC_SOURCES := pimacs-section.el pimacs-utils.el pimacs-state-line.el \
+	pimacs-core.el pimacs-agent.el pimacs.el
 
 $(CASK_DIR): Cask
 	cask install
@@ -130,7 +133,11 @@ docs-lint:
 	  --eval "(checkdoc-file \"pimacs-core.el\")" 2>&1 | grep '^pimacs[.-]' | grep -v 'All variables and subroutines might as well have a documentation string' || true
 
 .PHONY: docs
-docs: pimacs.info
+docs: docs/index.html
+
+pimacs.info: Makefile pimacs.texi $(PIMACS_DOC_SOURCES)
 	@ruby -e 'txt = IO.read("pimacs.texi").split("@c custom-variables-start")[0] + "@c custom-variables-start\n\n" + `$(EMACS) -Q --batch --eval "$$ESCRIPT"` + "@c custom-variables-end" + IO.read("pimacs.texi").split("@c custom-variables-end")[1]; File.write("pimacs.texi", txt)'
-	@makeinfo pimacs.texi
-	@makeinfo --no-number-sections --html --no-split -o ./docs/index.html pimacs.texi
+	@makeinfo -D 'VERSION $(PIMACS_VERSION)' -o pimacs.info pimacs.texi
+
+docs/index.html: pimacs.info
+	@makeinfo -D 'VERSION $(PIMACS_VERSION)' --no-number-sections --html --no-split -o $@ pimacs.texi
