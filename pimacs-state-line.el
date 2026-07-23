@@ -49,7 +49,8 @@
                    (const :tag "Output tokens" :output_tokens)
                    (const :tag "Cache-read tokens" :cache_read_tokens)
                    (const :tag "Cache-write tokens" :cache_write_tokens)
-                   (const :tag "Cache hit percent" :cache_hit_percent)
+                   (const :tag "Per-turn cache hit percent" :cache_hit_percent)
+                   (const :tag "Total cache hit percent" :total_cache_hit_percent)
                    (const :tag "Total tokens" :total_tokens)
                    (const :tag "Session cost" :cost)
                    (const :tag "Context usage" :context_usage)
@@ -91,7 +92,8 @@ Session statistics keywords:
 `:output_tokens'            Output token count.
 `:cache_read_tokens'        Cache-read token count.
 `:cache_write_tokens'       Cache-write token count.
-`:cache_hit_percent'        Cache hit percentage.
+`:cache_hit_percent'        Cache hit percentage for the last completed turn.
+`:total_cache_hit_percent'  Cache hit percentage for the entire session.
 `:total_tokens'             Total token count.
 `:cost'                     Session cost.
 `:context_usage'            Context tokens and context window.
@@ -118,6 +120,9 @@ See `pimacs-header-line-format' for available components."
 (pimacs--def-permanent-buffer-local pimacs--header-line-state nil)
 (pimacs--def-permanent-buffer-local pimacs--agent-state nil)
 (pimacs--def-permanent-buffer-local pimacs--spinner nil)
+(pimacs--def-permanent-buffer-local pimacs--current-turn-tokens nil)
+(pimacs--def-permanent-buffer-local pimacs--last-turn-tokens nil)
+(pimacs--def-permanent-buffer-local pimacs--cache-stats-session-id nil)
 
 (defun pimacs--format-tool-state (tools)
   (pcase tools
@@ -141,7 +146,8 @@ See `pimacs-header-line-format' for available components."
 (defun pimacs--state-line-state ()
   (append (list :spinner pimacs--spinner
                 :agentState pimacs--agent-state
-                :projectRoot pimacs--project-root)
+                :projectRoot pimacs--project-root
+                :lastTurnTokens pimacs--last-turn-tokens)
           pimacs--header-line-state))
 
 (defun pimacs--format-state-line-value (value)
@@ -219,10 +225,10 @@ See `pimacs-header-line-format' for available components."
 (defun pimacs--format-state-line-cache-write-tokens (state)
   (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :tokens :cacheWrite)))
 
-(defun pimacs--format-state-line-cache-hit-percent (state)
-  (let* ((input (pimacs--plist-get state :sessionStats :tokens :input))
-         (cache-read (pimacs--plist-get state :sessionStats :tokens :cacheRead))
-         (cache-write (pimacs--plist-get state :sessionStats :tokens :cacheWrite)))
+(defun pimacs--format-cache-hit-percent (tokens)
+  (let ((input (plist-get tokens :input))
+        (cache-read (plist-get tokens :cacheRead))
+        (cache-write (plist-get tokens :cacheWrite)))
     (if (and (numberp input) (numberp cache-read) (numberp cache-write))
         (let ((total (+ input cache-read cache-write)))
           (if (> total 0)
@@ -234,6 +240,13 @@ See `pimacs-header-line-format' for available components."
                       "%%")
             "?"))
       "?")))
+
+(defun pimacs--format-state-line-total-cache-hit-percent (state)
+  (pimacs--format-cache-hit-percent
+   (pimacs--plist-get state :sessionStats :tokens)))
+
+(defun pimacs--format-state-line-cache-hit-percent (state)
+  (pimacs--format-cache-hit-percent (plist-get state :lastTurnTokens)))
 
 (defun pimacs--format-state-line-total-tokens (state)
   (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :tokens :total)))
@@ -279,6 +292,7 @@ See `pimacs-header-line-format' for available components."
     (:cache_read_tokens . pimacs--format-state-line-cache-read-tokens)
     (:cache_write_tokens . pimacs--format-state-line-cache-write-tokens)
     (:cache_hit_percent . pimacs--format-state-line-cache-hit-percent)
+    (:total_cache_hit_percent . pimacs--format-state-line-total-cache-hit-percent)
     (:total_tokens . pimacs--format-state-line-total-tokens)
     (:cost . pimacs--format-state-line-cost)
     (:agent_state . pimacs--format-state-line-agent-state)
@@ -324,9 +338,37 @@ See `pimacs-header-line-format' for available components."
                   right)
         left))))
 
+(defun pimacs--usage-token-count (usage key)
+  (let ((value (plist-get usage key)))
+    (if (numberp value) value 0)))
+
+(defun pimacs--begin-turn-cache-stats ()
+  (setq pimacs--current-turn-tokens
+        '(:input 0 :cacheRead 0 :cacheWrite 0)))
+
+(defun pimacs--capture-message-cache-stats (message)
+  (when-let* ((usage (plist-get message :usage))
+              (input (plist-get usage :input))
+              ((numberp input)))
+    (unless pimacs--current-turn-tokens
+      (pimacs--begin-turn-cache-stats))
+    (dolist (key '(:input :cacheRead :cacheWrite))
+      (cl-incf (plist-get pimacs--current-turn-tokens key)
+               (pimacs--usage-token-count usage key)))))
+
+(defun pimacs--end-turn-cache-stats ()
+  (when pimacs--current-turn-tokens
+    (setq pimacs--last-turn-tokens pimacs--current-turn-tokens
+          pimacs--current-turn-tokens nil)
+    (force-mode-line-update)))
+
 (defun pimacs--set-header-line-state (state stats)
-  (setq pimacs--header-line-state
-        (plist-put state :sessionStats stats))
+  (let ((session-id (plist-get stats :sessionId)))
+    (unless (equal session-id pimacs--cache-stats-session-id)
+      (setq pimacs--cache-stats-session-id session-id
+            pimacs--current-turn-tokens nil
+            pimacs--last-turn-tokens nil)))
+  (setq pimacs--header-line-state (plist-put state :sessionStats stats))
   (force-mode-line-update))
 
 (defun pimacs--update-header-line ()

@@ -837,6 +837,7 @@ with the message plist to insert the custom message content."
          (role (pimacs--message-role message)))
     (pcase role
       ("assistant"
+       (pimacs--capture-message-cache-stats message)
        (let ((index 0))
          (pimacs--docontent (item (plist-get message :content))
            (pcase (plist-get item :type)
@@ -1471,6 +1472,9 @@ with the message plist to insert the custom message content."
       'thinking)))
 
 (defun pimacs--handle-agent-state (event)
+  (pcase (plist-get event :type)
+    ("turn_start" (pimacs--begin-turn-cache-stats))
+    ("turn_end" (pimacs--end-turn-cache-stats)))
   (cl-case (intern (plist-get event :type))
     (agent_start (pimacs--update-agent-state 'thinking))
     (agent_end (pimacs--update-agent-state nil)
