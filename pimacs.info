@@ -20,10 +20,11 @@ END-INFO-DIR-ENTRY
 
 File: pimacs.info,  Node: Top,  Next: Introduction,  Up: (dir)
 
-Pimacs User Manual
-******************
+Pimacs User Manual v0.2.0
+*************************
 
-Pimacs is an Emacs client for Pi Coding Agent.
+Pimacs is an Emacs client for Pi Coding Agent (https://pi.dev/).  For
+release history, see the changelog (changelog.html).
 
 * Menu:
 
@@ -58,9 +59,9 @@ First, install the Pi agent using npm:
 
      npm install -g --ignore-scripts @earendil-works/pi-coding-agent
 
-   Then start Pimacs and run ‘/login’ to configure your provider:
-
-     pi
+   Pimacs does not yet support authentication configuration.  To
+configure your provider, run ‘pi’ in a terminal, then run ‘/login’ in
+Pi.
 
 2.2 Install ‘pimacs.el’
 =======================
@@ -98,6 +99,7 @@ anywhere in the chat buffer to move point to the prompt input area.
 * Sending Context::
 * Images::
 * State Lines::
+* Managing Sessions::
 
 
 File: pimacs.info,  Node: Slash Commands,  Next: File Name Completion,  Up: Usage
@@ -213,7 +215,7 @@ chat buffer, or paste a supported image from the clipboard via
 the mouse, or place point on it and press ‘backspace’ or ‘delete’.
 
 
-File: pimacs.info,  Node: State Lines,  Prev: Images,  Up: Usage
+File: pimacs.info,  Node: State Lines,  Next: Managing Sessions,  Prev: Images,  Up: Usage
 
 3.6 State Lines
 ===============
@@ -230,6 +232,36 @@ following components.
 
    See ‘pimacs-header-line-format’ for available components.  A
 component may also be a function that receives the current state plist.
+
+   Extension status text can be placed in either state line with a
+‘(:status STATUS-KEY ...)’ component.  STATUS-KEY is the key used by the
+extension's status update.  Text properties after the key customize the
+status at that placement.
+
+     (setq pimacs-header-line-format
+           '(:context_usage " " (:status "xyz-status" face font-lock-warning-face)
+             :spacer :model))
+
+   By default, status text also appears beside the prompt.  To display a
+status only in a state line, add its key to
+‘pimacs-status-widget-hidden-keys’.
+
+     (setq pimacs-status-widget-hidden-keys '("xyz-status"))
+
+
+File: pimacs.info,  Node: Managing Sessions,  Prev: State Lines,  Up: Usage
+
+3.7 Managing Sessions
+=====================
+
+Use ‘pimacs-switch-session’ to switch between active Pimacs chat
+sessions using completion.  Use ‘pimacs-list-sessions’ to display all
+active chat sessions in a sortable tabulated list.  Press ‘RET’ to visit
+the session on the current line and ‘g’ to refresh the list.  Select a
+column header to sort by that column.
+
+   Customize the list's columns and initial sort order with
+‘pimacs-list-sessions-table’ and ‘pimacs-list-sessions-sort-key’.
 
 
 File: pimacs.info,  Node: Sandbox,  Next: How It Works,  Prev: Usage,  Up: Top
@@ -303,9 +335,13 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 7 Custom Variables
 ******************
 
- -- User Option: pimacs-use-ansi-colors t
+ -- User Option: pimacs-status-widget-hidden-keys nil
 
-     Whether to render ANSI colors in widget and status output.
+     Status keys to hide from the default status widget.
+
+     Hidden statuses remain available to ‘(:status STATUS-KEY ...)’
+     components in ‘pimacs-header-line-format’ and
+     ‘pimacs-mode-line-format’.
 
  -- User Option: pimacs-file-completion-backend 'project
 
@@ -321,29 +357,6 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
  -- User Option: pimacs-resume-max-sessions 100
 
      Maximum number of recent sessions to list when resuming a session.
-
- -- User Option: pimacs-list-sessions-table
-
-          '(("Session" . (:session_name face font-lock-function-name-face))
-            ("Provider" . :provider)
-            ("Model" . :model)
-            ("State" . (:agent_state face font-lock-keyword-face))
-            ("Context" . (:context_usage face shadow))
-            ("Messages" . :total_messages)
-            ("Cost" . (:cost face shadow))
-            ("Project" . (:project_root face shadow)))
-
-     Columns displayed by ‘pimacs-list-sessions’.
-
-     Each entry is (HEADER .  COMPONENT). COMPONENT uses the same format
-     as an entry in ‘pimacs-header-line-format’.
-
- -- User Option: pimacs-list-sessions-sort-key '("Session" . nil)
-
-     Initial sort order for ‘pimacs-list-sessions’.
-
-     The car is a header from ‘pimacs-list-sessions-table’.  A non-nil
-     cdr sorts in descending order.
 
  -- User Option: pimacs-prompt-streaming-behavior 'followUp
 
@@ -455,6 +468,34 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
      Whether to pop to the chat buffer after sending region, filename or
      errors.
 
+ -- User Option: pimacs-chat-keep-input-at-bottom t
+
+     Whether to keep the input area at the bottom as new chat content is
+     added.
+
+ -- User Option: pimacs-list-sessions-table
+
+          '(("Session" . (:session_name face font-lock-type-face))
+            ("Provider" . :provider)
+            ("Model" . :model)
+            ("State" . (:agent_state face font-lock-constant-face))
+            ("Context" . (:context_usage face shadow))
+            ("Messages" . :total_messages)
+            ("Cost" . (:cost face shadow))
+            ("Project" . (:project_root face shadow)))
+
+     Columns displayed by ‘pimacs-list-sessions’.
+
+     Each entry is (HEADER .  COMPONENT). COMPONENT uses the same format
+     as an entry in ‘pimacs-header-line-format’.
+
+ -- User Option: pimacs-list-sessions-sort-key '("Session" . nil)
+
+     Initial sort order for ‘pimacs-list-sessions’.
+
+     The car is a header from ‘pimacs-list-sessions-table’.  A non-nil
+     cdr sorts in descending order.
+
  -- User Option: pimacs-sync-request-timeout 2
 
      The number of seconds to wait for a sync response.
@@ -480,6 +521,10 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      File to write RPC JSON log entries to.
 
+ -- User Option: pimacs-use-ansi-colors t
+
+     Whether to render ANSI colors in widget and status output.
+
  -- User Option: pimacs-header-line-format '(:context_usage " ("
           :compaction_mode ")" :spacer "(" :provider ") " :model " • "
           :thinking_level)
@@ -489,30 +534,74 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
      Strings are displayed literally.  Functions are called with the
      state plist and their returned values are displayed.  A keyword
      component can include text properties using ‘propertize’ syntax.
-     For example: "‘(:model face font-lock-function-name-face)’".
+     For example: "‘(:model face font-lock-function-name-face)’".  A
+     status component has form ‘(:status STATUS-KEY PROPERTY VALUE...)’;
+     it displays the text set by an extension with STATUS-KEY and
+     accepts optional text properties.  For example: ‘(:status
+     "xyz-status" face font-lock-warning-face)’.
 
      The following keywords are replaced with state information.
 
-     Session state keywords: ‘:model’ Model identifier.  ‘:provider’
-     Model provider.  ‘:thinking_level’ Thinking level.  ‘:session_name’
-     Session name.  ‘:project_root’ Project root directory.
-     ‘:compaction_mode’ ‘auto’ or ‘manual’.  ‘:message_count’ Message
-     count.  ‘:pending_message_count’ Pending message count.
+     Session state keywords:
+     ‘:model’
+          Model identifier.
+     ‘:provider’
+          Model provider.
+     ‘:thinking_level’
+          Thinking level.
+     ‘:session_name’
+          Session name.
+     ‘:project_root’
+          Project root directory.
+     ‘:compaction_mode’
+          ‘auto’ or ‘manual’.
+     ‘:message_count’
+          Message count.
+     ‘:pending_message_count’
+          Pending message count.
 
-     Session statistics keywords: ‘:user_messages’ User message count.
-     ‘:assistant_messages’ Assistant message count.  ‘:tool_calls’ Tool
-     call count.  ‘:tool_results’ Tool result count.  ‘:total_messages’
-     Total message count.  ‘:input_tokens’ Input token count.
-     ‘:output_tokens’ Output token count.  ‘:cache_read_tokens’
-     Cache-read token count.  ‘:cache_write_tokens’ Cache-write token
-     count.  ‘:total_tokens’ Total token count.  ‘:cost’ Session cost.
-     ‘:context_usage’ Context tokens and context window.
-     ‘:context_tokens’ Context token count.  ‘:context_window’ Context
-     window size.
+     Session statistics keywords:
+     ‘:user_messages’
+          User message count.
+     ‘:assistant_messages’
+          Assistant message count.
+     ‘:tool_calls’
+          Tool call count.
+     ‘:tool_results’
+          Tool result count.
+     ‘:total_messages’
+          Total message count.
+     ‘:input_tokens’
+          Input token count.
+     ‘:output_tokens’
+          Output token count.
+     ‘:cache_read_tokens’
+          Cache-read token count.
+     ‘:cache_write_tokens’
+          Cache-write token count.
+     ‘:cache_hit_percent’
+          Total cache hit percentage.
+     ‘:total_tokens’
+          Total token count.
+     ‘:cost’
+          Session cost.
+     ‘:context_usage’
+          Context tokens and context window.
+     ‘:context_tokens’
+          Context token count.
+     ‘:context_window’
+          Context window size.
 
-     UI keywords: ‘:agent_state’ Current agent state.  ‘:spinner’ Active
-     agent spinner.  ‘:spacer’ Space that right-aligns all following
-     entries.
+     UI keywords:
+     ‘:agent_state’
+          Current agent state.
+     ‘:spinner’
+          Active agent spinner.
+     ‘:spacer’
+          Space that right-aligns all following entries.
+
+     Status components: ‘(:status STATUS-KEY ...)’ Extension status text
+     for STATUS-KEY.
 
      Use at most one ‘:spacer’.
 
@@ -551,19 +640,20 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
 Tag Table:
 Node: Top746
-Node: Introduction1012
-Node: Setup1269
-Node: Usage1872
-Node: Slash Commands2700
-Node: File Name Completion4941
-Node: Bash5269
-Node: Sending Context5536
-Node: Images6344
-Node: State Lines7209
-Node: Sandbox7897
-Node: How It Works8279
-Node: Keybindings8729
-Node: Custom Variables10887
+Node: Introduction1102
+Node: Setup1359
+Node: Usage2030
+Node: Slash Commands2880
+Node: File Name Completion5121
+Node: Bash5449
+Node: Sending Context5716
+Node: Images6524
+Node: State Lines7389
+Node: Managing Sessions8717
+Node: Sandbox9310
+Node: How It Works9692
+Node: Keybindings10142
+Node: Custom Variables12300
 
 End Tag Table
 

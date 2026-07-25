@@ -2,8 +2,15 @@
 
 ## Unreleased
 
+## v0.2.0 - 2026-07-25
+
 ### Added
 
+- Bash command output is streamed while the command is running.
+- Extension status text can be placed in header and mode lines with
+  `(:status STATUS-KEY ...)`, including per-placement face customization.
+  Status keys can be hidden from the prompt status widget with
+  `pimacs-status-widget-hidden-keys`.
 - `pimacs-list-sessions` displays active chats in a sortable tabulated list.
   Its columns and initial sort order are configurable with
   `pimacs-list-sessions-table` and `pimacs-list-sessions-sort-key`.

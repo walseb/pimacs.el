@@ -10,7 +10,6 @@
 
 ;; This program is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
-
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
@@ -49,19 +48,14 @@
 (require 'seq)
 (require 'mailcap)
 (require 'transient)
-(require 'tabulated-list)
 
-(defgroup pimacs nil
-  "Emacs client for Pi."
-  :prefix "pimacs-"
-  :group 'tools)
-
+(require 'pimacs-core)
+(require 'pimacs-utils)
 (require 'pimacs-section)
 (require 'pimacs-edit)
-(require 'pimacs-utils)
-(require 'pimacs-core)
 (require 'pimacs-agent)
 (require 'pimacs-state-line)
+(require 'pimacs-session)
 
 (defface pimacs-chat-role-face
   '((t :inherit font-lock-builtin-face))
@@ -128,10 +122,12 @@
   "Face used for extension status."
   :group 'pimacs)
 
+(defcustom pimacs-status-widget-hidden-keys nil
+  "Status keys to hide from the default status widget.
 
-(defcustom pimacs-use-ansi-colors t
-  "Whether to render ANSI colors in widget and status output."
-  :type 'boolean
+Hidden statuses remain available to `(:status STATUS-KEY ...)' components
+in `pimacs-header-line-format' and `pimacs-mode-line-format'."
+  :type '(repeat string)
   :group 'pimacs)
 
 (defcustom pimacs-file-completion-backend 'project
@@ -150,33 +146,6 @@
 (defcustom pimacs-resume-max-sessions 100
   "Maximum number of recent sessions to list when resuming a session."
   :type 'integer
-  :group 'pimacs)
-
-(defcustom pimacs-list-sessions-table
-  '(("Session" . (:session_name face font-lock-function-name-face))
-    ("Provider" . :provider)
-    ("Model" . :model)
-    ("State" . (:agent_state face font-lock-keyword-face))
-    ("Context" . (:context_usage face shadow))
-    ("Messages" . :total_messages)
-    ("Cost" . (:cost face shadow))
-    ("Project" . (:project_root face shadow)))
-  "Columns displayed by `pimacs-list-sessions'.
-
-Each entry is (HEADER . COMPONENT).  COMPONENT uses the same format as an
-entry in `pimacs-header-line-format'."
-  :type `(repeat
-          (cons (string :tag "Header")
-                ,(cadr pimacs--state-line-format-type)))
-  :group 'pimacs)
-
-(defcustom pimacs-list-sessions-sort-key '("Session" . nil)
-  "Initial sort order for `pimacs-list-sessions'.
-
-The car is a header from `pimacs-list-sessions-table'.  A non-nil cdr sorts
-in descending order."
-  :type '(cons (string :tag "Column")
-               (boolean :tag "Descending"))
   :group 'pimacs)
 
 (defcustom pimacs-prompt-streaming-behavior 'followUp
@@ -291,13 +260,17 @@ with the message plist to insert the custom message content."
   :type 'boolean
   :group 'pimacs)
 
+(defcustom pimacs-chat-keep-input-at-bottom t
+  "Whether to keep the input area at the bottom as new chat content is added."
+  :type 'boolean
+  :group 'pimacs)
+
 (defvar-local pimacs--project-file-cache nil)
 
 (defun pimacs-clear-project-file-cache ()
   "Clear the project file cache."
   (interactive)
   (setq pimacs--project-file-cache nil))
-
 
 ;;; Widget
 
@@ -323,7 +296,6 @@ with the message plist to insert the custom message content."
     (goto-char (widget-field-text-end widget))
     (when-let (window (get-buffer-window (current-buffer) t))
       (set-window-point window (widget-field-text-end widget)))))
-
 
 (defmacro pimacs--on-response-success (response &rest body)
   (declare (indent 1))
@@ -352,13 +324,10 @@ with the message plist to insert the custom message content."
              (pimacs--insert-error (format "%s cancelled." ,operation))))
        ,@body)))
 
-
 ;;; State management
 
 (cl-defstruct pimacs-tool-call
   call-section result-section prev-text tool-name args)
-
-(defvar pimacs--chats (make-hash-table :test 'equal))
 
 (pimacs--def-permanent-buffer-local pimacs--prompt-widget nil)
 (pimacs--def-permanent-buffer-local pimacs--attached-images (vector))
@@ -367,9 +336,9 @@ with the message plist to insert the custom message content."
 (pimacs--def-permanent-buffer-local pimacs--prompt-after-widget nil)
 (pimacs--def-permanent-buffer-local pimacs--prompt-widget-lines nil)
 (pimacs--def-permanent-buffer-local pimacs--status-widget nil)
-(pimacs--def-permanent-buffer-local pimacs--status-widget-texts nil)
 (pimacs--def-permanent-buffer-local pimacs--content-sections nil)
 (pimacs--def-permanent-buffer-local pimacs--tool-calls nil)
+(pimacs--def-permanent-buffer-local pimacs--bash-executions nil)
 (pimacs--def-permanent-buffer-local pimacs--cleanup-callback-fn nil)
 (pimacs--def-permanent-buffer-local pimacs--retry-in-progress nil)
 (pimacs--def-permanent-buffer-local pimacs--commands nil)
@@ -411,11 +380,21 @@ with the message plist to insert the custom message content."
         (setq pimacs--prompt-history-index 0)
         (pimacs-focus-prompt)))))
 
-
 (defun pimacs--chat-buffer-name (&optional title)
   (if title
       (format "*pimacs-chat:%s:%s*" (pimacs--project-name) title)
     (format "*pimacs-chat:%s*" (pimacs--project-name))))
+
+(defun pimacs--recenter-chat ()
+  (when-let ((window (and pimacs-chat-keep-input-at-bottom
+                          (get-buffer-window (current-buffer) t))))
+    (with-selected-window window
+      (recenter (- -1 scroll-margin (pimacs--widget-lines pimacs--prompt-widget) (pimacs--extra-widget-lines))))))
+
+(defun pimacs--point-in-prompt-p ()
+  (when-let (window (get-buffer-window (current-buffer) t))
+    (>= (window-point window)
+        (widget-get pimacs--prompt-widget :from))))
 
 (defmacro pimacs--widget-save-excursion (&rest body)
   "Insert before PROMPT-WIDGET without moving point.  BODY is the content."
@@ -434,76 +413,6 @@ with the message plist to insert the custom message content."
          (with-current-buffer buffer
            (progn ,@body))
        (error "Chat doesn't exist, start a new chat using M-x pimacs-chat"))))
-
-
-(defun pimacs--current-chat ()
-  (gethash pimacs--project-key pimacs--chats))
-
-(defun pimacs--active-chat-candidates ()
-  (let (candidates)
-    (maphash
-     (lambda (key agent)
-       (when-let ((chat (gethash key pimacs--chats)))
-         (when (and (process-live-p agent)
-                    (buffer-live-p chat))
-           (push (cons key chat) candidates))))
-     pimacs--agents)
-    candidates))
-
-(defun pimacs--relevant-chat-candidates ()
-  (let ((path (expand-file-name (or buffer-file-name default-directory))))
-    (seq-filter
-     (lambda (candidate)
-       (when-let* ((agent (gethash (car candidate) pimacs--agents))
-                   (root (process-get agent 'project-root)))
-         (file-in-directory-p path root)))
-     (pimacs--active-chat-candidates))))
-
-(defun pimacs--chat-session-choice-label (chat &optional include-id)
-  (with-current-buffer chat
-    (let* ((name (plist-get pimacs--header-line-state :sessionName))
-           (session-id (pimacs--plist-get pimacs--header-line-state :sessionStats :sessionId))
-           (short-id (pimacs--short-uuid session-id)))
-      (if (and (stringp name) (not (string-empty-p name)))
-          (if (and include-id short-id)
-              (concat name " " short-id)
-            name)
-        (or short-id "unknown")))))
-
-(defun pimacs--select-chat (candidates prompt)
-  (cond
-   ((null candidates) nil)
-   ((null (cdr candidates)) (car candidates))
-   (t
-    (let* ((labels
-            (mapcar (lambda (candidate)
-                      (cons (pimacs--chat-session-choice-label (cdr candidate)) candidate))
-                    candidates))
-           (choices
-            (sort
-             (mapcar
-              (lambda (label)
-                (if (> (cl-count (car label) labels :key #'car :test #'equal) 1)
-                    (cons (pimacs--chat-session-choice-label (cdr (cdr label)) t) (cdr label))
-                  label))
-              labels)
-             (lambda (a b) (string< (car a) (car b)))))
-           (annotation-function
-            (lambda (label)
-              (when-let* ((candidate (cdr (assoc label choices)))
-                          (agent (gethash (car candidate) pimacs--agents))
-                          (root (process-get agent 'project-root)))
-                (concat "  " (propertize (expand-file-name root) 'face 'dired-directory)))))
-           (completion-extra-properties
-            `(:annotation-function ,annotation-function))
-           (selected (completing-read prompt choices nil t)))
-      (cdr (assoc selected choices))))))
-
-(defun pimacs--select-relevant-chat ()
-  (when-let ((candidate (pimacs--select-chat (pimacs--relevant-chat-candidates)
-                                             "Pimacs session: ")))
-    (setq-local pimacs--project-key (car candidate))
-    (cdr candidate)))
 
 ;;; Completion
 
@@ -829,7 +738,6 @@ with the message plist to insert the custom message content."
                          :tool-name tool-name
                          :args args)
                         pimacs--tool-calls)))))))))
-
 
 (defun pimacs--handle-message-end (event)
   (let* ((message (plist-get event :message))
@@ -1163,6 +1071,21 @@ with the message plist to insert the custom message content."
               (insert new-text)))
           (setf (pimacs-tool-call-prev-text entry) new-text))))))
 
+(defun pimacs--handle-bash-execution-update (event)
+  (let* ((request-id (plist-get event :id))
+         (delta (plist-get event :delta))
+         (entry (gethash request-id pimacs--bash-executions)))
+    (unless (string-empty-p delta)
+      (let ((call-section (pimacs-tool-call-call-section entry))
+            (result-section (pimacs-tool-call-result-section entry)))
+        (pimacs--widget-save-excursion
+          (if result-section
+              (pimacs-section--append-section result-section
+                (insert delta))
+            (setf (pimacs-tool-call-result-section entry)
+                  (pimacs-section--create-section 'tool-result call-section
+                    (insert delta)))))))))
+
 (defun pimacs--handle-tool-execution-end (event)
   (let* ((tool-call-id (plist-get event :toolCallId))
          (result (plist-get event :result))
@@ -1297,20 +1220,22 @@ with the message plist to insert the custom message content."
 
 (defun pimacs--update-status-widget ()
   (let (entries)
-    (when pimacs--status-widget-texts
+    (when pimacs--status-texts
       (maphash (lambda (key text)
-                 (push (cons key text) entries))
-               pimacs--status-widget-texts))
+                 (unless (member key pimacs-status-widget-hidden-keys)
+                   (push (cons key text) entries)))
+               pimacs--status-texts))
     (widget-value-set pimacs--status-widget
                       (pimacs--widget-ensure-trailing-newline
-                       (pimacs--join (pimacs--sort-entries-by-key entries) " ")))))
+                       (pimacs--join (pimacs--sort-entries-by-key entries) " ")))
+    (force-mode-line-update)))
 
 (defun pimacs--handle-set-status (event)
   (let* ((status-key (plist-get event :statusKey))
          (status-text (plist-get event :statusText)))
     (if (or (not status-text) (string-empty-p status-text))
-        (remhash status-key pimacs--status-widget-texts)
-      (puthash status-key status-text pimacs--status-widget-texts))
+        (remhash status-key pimacs--status-texts)
+      (puthash status-key status-text pimacs--status-texts))
     (pimacs--update-status-widget)))
 
 (defun pimacs--handle-set-editor-text (event)
@@ -1419,6 +1344,7 @@ with the message plist to insert the custom message content."
 (defun pimacs--register-event-listeners ()
   (pimacs--set-event-listener "message_update" #'pimacs--handle-message-update)
   (pimacs--set-event-listener "message_end" #'pimacs--handle-message-end)
+  (pimacs--set-event-listener "bash_execution_update" #'pimacs--handle-bash-execution-update)
 
   (pimacs--set-event-listener "tool_execution_update" #'pimacs--handle-tool-execution-update)
   (pimacs--set-event-listener "tool_execution_end" #'pimacs--handle-tool-execution-end)
@@ -1473,10 +1399,9 @@ with the message plist to insert the custom message content."
 (defun pimacs--handle-agent-state (event)
   (cl-case (intern (plist-get event :type))
     (agent_start (pimacs--update-agent-state 'thinking))
-    (agent_end (pimacs--update-agent-state nil)
-               (pimacs-clear-project-file-cache))
+    (agent_settled (pimacs--update-agent-state nil)
+                   (pimacs-clear-project-file-cache))
     (turn_start (pimacs--update-agent-state 'thinking))
-    (turn_end (pimacs--update-agent-state nil))
     (tool_execution_start
      (pimacs--update-agent-state
       (pimacs--agent-state-add-tool (plist-get event :toolName))))
@@ -1500,7 +1425,6 @@ with the message plist to insert the custom message content."
     (pimacs--hash-remove-if (lambda (k _v) (equal (car k) project-key)) pimacs--event-listeners)
     (ignore-errors
       (pimacs--kill-agent))))
-
 
 ;;; Commands
 
@@ -1576,7 +1500,6 @@ with the message plist to insert the custom message content."
              "prompt" args
              (pimacs--on-response-success-callback resp
                (pimacs--clear-prompt prompt))))))))))
-
 
 (defun pimacs-send-prompt-alternate (&optional prompt)
   "Send PROMPT with the alternative streaming behavior.
@@ -2079,13 +2002,14 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
   (dolist (child (copy-sequence (pimacs-section-children pimacs-section--root-section)))
     (pimacs-section--delete-section child))
   (clrhash pimacs--content-sections)
-  (clrhash pimacs--tool-calls))
+  (clrhash pimacs--tool-calls)
+  (clrhash pimacs--bash-executions))
 
 (defun pimacs--clear-session-widgets ()
   (when pimacs--prompt-widget-lines
     (clrhash pimacs--prompt-widget-lines))
-  (when pimacs--status-widget-texts
-    (clrhash pimacs--status-widget-texts))
+  (when pimacs--status-texts
+    (clrhash pimacs--status-texts))
   (pimacs--update-prompt-widgets)
   (pimacs--update-status-widget))
 
@@ -2285,17 +2209,31 @@ summarization."
         (when exclude-from-context
           (setq args (nconc args (list :excludeFromContext t))))
         (pimacs--insert-tool-call call-section "bash" args)
-        (pimacs--send-command
-         "bash" args
-         (lambda (resp)
-           (pimacs--on-response-success resp
-             (pimacs--update-header-line)
-             (let* ((data (plist-get resp :data))
-                    (output (plist-get data :output)))
-               (pimacs--widget-save-excursion
-                 (pimacs-section--create-section 'tool-result call-section
-                   (pimacs--insert-tool-result "bash" output nil data)))))
-           (pimacs--update-agent-state nil)))))))
+        (let ((request-id
+               (pimacs--send-command
+                "bash" args
+                (lambda (resp)
+                  (let ((request-id (plist-get resp :id)))
+                    (when-let ((entry (gethash request-id pimacs--bash-executions)))
+                      (pimacs--on-response-success resp
+                        (pimacs--update-header-line)
+                        (let* ((data (plist-get resp :data))
+                               (output (plist-get data :output))
+                               (result-section (pimacs-tool-call-result-section entry))
+                               (call-section (pimacs-tool-call-call-section entry)))
+                          (pimacs--widget-save-excursion
+                            (setf (pimacs-tool-call-result-section entry)
+                                  (pimacs-section--create-or-replace-section
+                                      result-section 'tool-result call-section
+                                    (pimacs--insert-tool-result "bash" output nil data))))))
+                      (remhash request-id pimacs--bash-executions))
+                    (pimacs--update-agent-state
+                     (and (> (hash-table-count pimacs--bash-executions) 0) 'bash)))))))
+          (puthash request-id
+                   (make-pimacs-tool-call :call-section call-section
+                                          :tool-name "bash"
+                                          :args args)
+                   pimacs--bash-executions))))))
 
 ;;; Chat mode
 
@@ -2306,7 +2244,6 @@ summarization."
      (setq pimacs--commands
            (mapcar (lambda (c) (cons (plist-get c :name) c))
                    (plist-get (plist-get resp :data) :commands))))))
-
 
 (defun pimacs--visit-file (result &optional other-window)
   (let ((file (plist-get result :file))
@@ -2430,6 +2367,7 @@ With a prefix argument OTHER-WINDOW, visit in other window."
   (setq header-line-format
         '(:eval (pimacs--format-state-line pimacs-header-line-format)))
   (setq pimacs--tool-calls (make-hash-table :test 'equal))
+  (setq pimacs--bash-executions (make-hash-table :test 'equal))
   (setq pimacs--content-sections (make-hash-table :test 'eql))
   (pimacs-section--create-root-section)
   (setq imenu-create-index-function #'pimacs--imenu-create-index)
@@ -2452,7 +2390,7 @@ With a prefix argument OTHER-WINDOW, visit in other window."
   (setq pimacs--prompt-after-widget (widget-create 'pimacs-item :face 'pimacs-widget-face pimacs--empty-widget-text))
   (setq pimacs--prompt-widget-lines (make-hash-table :test 'equal))
   (setq pimacs--status-widget (widget-create 'pimacs-item :face 'pimacs-status-face pimacs--empty-widget-text))
-  (setq pimacs--status-widget-texts (make-hash-table :test 'equal))
+  (setq pimacs--status-texts (make-hash-table :test 'equal))
   (setq-local dnd-protocol-alist
               (cons '("^file:" . pimacs--dnd-handler)
                     dnd-protocol-alist))
@@ -2525,75 +2463,6 @@ With a prefix argument, show a transient for setting NAME and ROOT."
       (pimacs-chat--transient)
     (pimacs-chat--create name root)))
 
-(defvar-keymap pimacs-list-sessions-mode-map
-  :doc "Keymap for `pimacs-list-sessions-mode'."
-  :parent tabulated-list-mode-map
-  "RET" #'pimacs-list-sessions-visit
-  "g" #'pimacs-list-sessions-refresh)
-
-(define-derived-mode pimacs-list-sessions-mode tabulated-list-mode "Pimacs Sessions"
-  "Major mode for listing active Pimacs sessions."
-  (setq tabulated-list-padding 0
-        tabulated-list-sort-key (copy-tree pimacs-list-sessions-sort-key)))
-
-(defun pimacs--list-sessions-entries ()
-  (mapcar
-   (lambda (candidate)
-     (with-current-buffer (cdr candidate)
-       (list candidate
-             (vconcat
-              (mapcar
-               (lambda (column)
-                 (pimacs--format-state-line-component
-                  (pimacs--state-line-state) (cdr column)))
-               pimacs-list-sessions-table)))))
-   (pimacs--active-chat-candidates)))
-
-(defun pimacs--list-sessions-format (entries)
-  (vconcat
-   (cl-loop for column in pimacs-list-sessions-table
-            for index from 0
-            collect
-            (list (car column)
-                  (max (+ 2 (string-width (car column)))
-                       (or (cl-loop for entry in entries
-                                    maximize (string-width
-                                              (aref (cadr entry) index)))
-                           0))
-                  t))))
-
-(defun pimacs-list-sessions-refresh ()
-  "Refresh the Pimacs sessions list."
-  (interactive)
-  (let ((entries (pimacs--list-sessions-entries)))
-    (setq tabulated-list-format (pimacs--list-sessions-format entries)
-          tabulated-list-entries entries)
-    (tabulated-list-init-header)
-    (tabulated-list-print t)))
-
-(defun pimacs-list-sessions-visit ()
-  "Visit the Pimacs session on the current line."
-  (interactive)
-  (when-let ((candidate (tabulated-list-get-id)))
-    (pop-to-buffer (cdr candidate))))
-
-(defun pimacs-list-sessions ()
-  "List active Pimacs sessions in a tabulated buffer."
-  (interactive)
-  (let ((buffer (get-buffer-create "*Pimacs Sessions*")))
-    (with-current-buffer buffer
-      (pimacs-list-sessions-mode)
-      (pimacs-list-sessions-refresh))
-    (pop-to-buffer buffer)))
-
-(defun pimacs-switch-session ()
-  "Switch to another active Pimacs chat session."
-  (interactive)
-  (if-let ((candidate (pimacs--select-chat (pimacs--active-chat-candidates)
-                                           "Switch to Pimacs session: ")))
-      (pop-to-buffer (cdr candidate))
-    (user-error "No active Pimacs sessions")))
-
 (defun pimacs-toggle-chat ()
   "Toggle chat window."
   (interactive)
@@ -2646,7 +2515,14 @@ If non-nil, call CB after the session refresh finishes."
           (lambda ()
             (when (buffer-live-p chat-buffer)
               (with-current-buffer chat-buffer
+                (pimacs-edit--close-for-chat chat-buffer)
                 (pimacs--kill-agent pimacs--cleanup-callback-fn)
+                (setq pimacs--retry-in-progress nil
+                      pimacs--header-line-state nil
+                      pimacs--commands nil)
+                (pimacs-clear-project-file-cache)
+                (pimacs--update-agent-state nil)
+                (force-mode-line-update)
                 (pimacs--widget-save-excursion
                   (pimacs--clear-sections)
                   (pimacs--clear-session-widgets))

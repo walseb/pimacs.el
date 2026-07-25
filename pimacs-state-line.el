@@ -4,7 +4,6 @@
 
 ;; This program is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
-
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
@@ -23,15 +22,17 @@
 ;;; Code:
 
 (require 'cl-lib)
+(require 'ansi-color)
 (require 'spinner)
 (require 'timeout)
 (require 'pimacs-utils)
+(require 'pimacs-core)
 (require 'pimacs-agent)
 
 (defconst pimacs--state-line-format-type
   '(repeat (choice (string :tag "Literal text")
                    (function :tag "Formatter function")
-                   (sexp :tag "Propertized component")
+                   (sexp :tag "Propertized or status component")
                    (const :tag "Model" :model)
                    (const :tag "Provider" :provider)
                    (const :tag "Thinking level" :thinking_level)
@@ -49,6 +50,7 @@
                    (const :tag "Output tokens" :output_tokens)
                    (const :tag "Cache-read tokens" :cache_read_tokens)
                    (const :tag "Cache-write tokens" :cache_write_tokens)
+                   (const :tag "Total cache hit percent" :cache_hit_percent)
                    (const :tag "Total tokens" :total_tokens)
                    (const :tag "Session cost" :cost)
                    (const :tag "Context usage" :context_usage)
@@ -66,7 +68,10 @@
 Strings are displayed literally.  Functions are called with the state
 plist and their returned values are displayed.  A keyword component can
 include text properties using `propertize' syntax.  For example:
-\"`(:model face font-lock-function-name-face)'\".
+\"`(:model face font-lock-function-name-face)'\".  A status component has
+form `(:status STATUS-KEY PROPERTY VALUE...)'; it displays the text set
+by an extension with STATUS-KEY and accepts optional text properties.
+For example: `(:status \"xyz-status\" face font-lock-warning-face)'.
 
 The following keywords are replaced with state information.
 
@@ -90,6 +95,7 @@ Session statistics keywords:
 `:output_tokens'            Output token count.
 `:cache_read_tokens'        Cache-read token count.
 `:cache_write_tokens'       Cache-write token count.
+`:cache_hit_percent'        Total cache hit percentage.
 `:total_tokens'             Total token count.
 `:cost'                     Session cost.
 `:context_usage'            Context tokens and context window.
@@ -101,6 +107,9 @@ UI keywords:
 `:spinner'                  Active agent spinner.
 `:spacer'                   Space that right-aligns all following entries.
 
+Status components:
+`(:status STATUS-KEY ...)'  Extension status text for STATUS-KEY.
+
 Use at most one `:spacer'."
   :type pimacs--state-line-format-type
   :group 'pimacs)
@@ -111,7 +120,6 @@ Use at most one `:spacer'."
 See `pimacs-header-line-format' for available components."
   :type pimacs--state-line-format-type
   :group 'pimacs)
-
 
 (pimacs--def-permanent-buffer-local pimacs--header-line-state nil)
 (pimacs--def-permanent-buffer-local pimacs--agent-state nil)
@@ -139,7 +147,8 @@ See `pimacs-header-line-format' for available components."
 (defun pimacs--state-line-state ()
   (append (list :spinner pimacs--spinner
                 :agentState pimacs--agent-state
-                :projectRoot pimacs--project-root)
+                :projectRoot pimacs--project-root
+                :statusTexts pimacs--status-texts)
           pimacs--header-line-state))
 
 (defun pimacs--format-state-line-value (value)
@@ -217,15 +226,26 @@ See `pimacs-header-line-format' for available components."
 (defun pimacs--format-state-line-cache-write-tokens (state)
   (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :tokens :cacheWrite)))
 
+(defun pimacs--format-state-line-cache-hit-percent (state)
+  (let* ((input (pimacs--plist-get state :sessionStats :tokens :input))
+         (cache-read (pimacs--plist-get state :sessionStats :tokens :cacheRead))
+         (cache-write (pimacs--plist-get state :sessionStats :tokens :cacheWrite)))
+    (if (and (numberp input) (numberp cache-read) (numberp cache-write))
+        (let ((total (+ input cache-read cache-write)))
+          (if (> total 0)
+              (concat (pimacs--format-number-fixed
+                       (* 100.0 (/ (float cache-read) total)) 1)
+                      "%")
+            "?"))
+      "?")))
+
 (defun pimacs--format-state-line-total-tokens (state)
   (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :tokens :total)))
 
 (defun pimacs--format-state-line-cost (state)
   (let ((cost (pimacs--plist-get state :sessionStats :cost)))
     (if (numberp cost)
-        (string-trim-right
-         (string-trim-right (format "%.6f" cost) "0+")
-         "[.]")
+        (pimacs--format-number-fixed cost 6)
       (pimacs--format-state-line-value cost))))
 
 (defun pimacs--format-state-line-agent-state (state)
@@ -238,6 +258,16 @@ See `pimacs-header-line-format' for available components."
                              (spinner-print spinner))))
       (concat " " spinner-str)
     ""))
+
+(defun pimacs--format-state-line-status (state status-key)
+  (when-let* ((status-texts (plist-get state :statusTexts))
+              ((hash-table-p status-texts))
+              ((stringp status-key))
+              (text (gethash status-key status-texts)))
+    (let ((text (replace-regexp-in-string "[\n\r]+" " " text)))
+      (if pimacs-use-ansi-colors
+          (ansi-color-apply text)
+        (ansi-color-filter-apply text)))))
 
 (defconst pimacs--state-line-formatters
   '((:model . pimacs--format-state-line-model)
@@ -260,6 +290,7 @@ See `pimacs-header-line-format' for available components."
     (:output_tokens . pimacs--format-state-line-output-tokens)
     (:cache_read_tokens . pimacs--format-state-line-cache-read-tokens)
     (:cache_write_tokens . pimacs--format-state-line-cache-write-tokens)
+    (:cache_hit_percent . pimacs--format-state-line-cache-hit-percent)
     (:total_tokens . pimacs--format-state-line-total-tokens)
     (:cost . pimacs--format-state-line-cost)
     (:agent_state . pimacs--format-state-line-agent-state)
@@ -269,6 +300,13 @@ See `pimacs-header-line-format' for available components."
 (defun pimacs--format-state-line-component (state component)
   (cond
    ((stringp component) component)
+   ((and (consp component) (eq (car component) :status))
+    (let ((status-key (cadr component)))
+      (unless (stringp status-key)
+        (error "Pimacs status component requires a string status key: %S" component))
+      (apply #'propertize
+             (or (pimacs--format-state-line-status state status-key) "")
+             (cddr component))))
    ((and (consp component) (keywordp (car component)))
     (apply #'propertize
            (pimacs--format-state-line-component state (car component))
@@ -279,6 +317,21 @@ See `pimacs-header-line-format' for available components."
       (error "Unknown Pimacs state-line component: %S" component)))
    ((functionp component) (funcall component state))
    (t (error "Unknown Pimacs state-line component: %S" component))))
+
+(defun pimacs--escape-mode-line-percent (text)
+  "Escape percent characters in TEXT while preserving text properties.
+
+Unlike `replace-regexp-in-string', this preserves TEXT's properties."
+  (let ((start 0)
+        parts)
+    (while (string-match "%" text start)
+      (push (substring text start (match-beginning 0)) parts)
+      (let ((percent (substring text (match-beginning 0) (match-end 0))))
+        (push percent parts)
+        (push percent parts))
+      (setq start (match-end 0)))
+    (push (substring text start) parts)
+    (apply #'concat (nreverse parts))))
 
 (defun pimacs--format-state-line (format)
   "Format the current state according to FORMAT."
@@ -296,14 +349,15 @@ See `pimacs-header-line-format' for available components."
             (apply-partially #'pimacs--format-state-line-component state))
            (left (mapconcat format-component left-components ""))
            (right (mapconcat format-component right-components "")))
-      (if spacer-position
-          (concat left
-                  (make-string (max 1 (- (window-width)
-                                         (length left)
-                                         (length right)))
-                               ?\s)
-                  right)
-        left))))
+      (pimacs--escape-mode-line-percent
+       (if spacer-position
+           (concat left
+                   (make-string (max 1 (- (window-width)
+                                          (length left)
+                                          (length right)))
+                                ?\s)
+                   right)
+         left)))))
 
 (defun pimacs--set-header-line-state (state stats)
   (setq pimacs--header-line-state

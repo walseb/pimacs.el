@@ -1667,7 +1667,7 @@ http_interactions:
 
 
           data:
-          {"id":"chatcmpl-915","object":"chat.completion.chunk","created":1783652787,"model":"qwen3.5:0.8b","system_fingerprint":"fp_ollama","choices":[],"usage":{"prompt_tokens":1545,"completion_tokens":233,"total_tokens":1778}}
+          {"id":"chatcmpl-915","object":"chat.completion.chunk","created":1783652787,"model":"qwen3.5:0.8b","system_fingerprint":"fp_ollama","choices":[],"usage":{"prompt_tokens":1545,"completion_tokens":233,"total_tokens":1778,"prompt_tokens_details":{"cached_tokens":1000}}}
 
 
           data: [DONE]

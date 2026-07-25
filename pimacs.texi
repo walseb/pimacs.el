@@ -1,7 +1,7 @@
 \input texinfo   @c -*-texinfo-*-
 @c %**start of header
 @setfilename pimacs.info
-@settitle Pimacs User Manual
+@settitle Pimacs User Manual v@value{VERSION}
 @c %**end of header
 
 @copying
@@ -57,9 +57,9 @@ hljs.highlightAll();
 @end direntry
 
 @node Top
-@top Pimacs User Manual
+@top Pimacs User Manual v@value{VERSION}
 
-Pimacs is an Emacs client for Pi Coding Agent.
+Pimacs is an Emacs client for @uref{https://pi.dev/, Pi Coding Agent}.  For release history, see the @uref{changelog.html, changelog}.
 
 @menu
 * Introduction::
@@ -89,11 +89,7 @@ First, install the Pi agent using npm:
 npm install -g --ignore-scripts @@earendil-works/pi-coding-agent
 @end example
 
-Then start Pimacs and run @code{/login} to configure your provider:
-
-@example
-pi
-@end example
+Pimacs does not yet support authentication configuration.  To configure your provider, run @code{pi} in a terminal, then run @code{/login} in Pi.
 
 @section Install @code{pimacs.el}
 
@@ -129,6 +125,7 @@ input area.
 * Sending Context::
 * Images::
 * State Lines::
+* Managing Sessions::
 @end menu
 
 @node Slash Commands
@@ -285,6 +282,36 @@ defcustoms.  Both accept strings and state components; use
 See @code{pimacs-header-line-format} for available components.  A
 component may also be a function that receives the current state plist.
 
+Extension status text can be placed in either state line with a
+@code{(:status STATUS-KEY ...)} component.  STATUS-KEY is the key used by
+the extension's status update.  Text properties after the key customize the
+status at that placement.
+
+@example
+(setq pimacs-header-line-format
+      '(:context_usage " " (:status "xyz-status" face font-lock-warning-face)
+        :spacer :model))
+@end example
+
+By default, status text also appears beside the prompt.  To display a status
+only in a state line, add its key to @code{pimacs-status-widget-hidden-keys}.
+
+@example
+(setq pimacs-status-widget-hidden-keys '("xyz-status"))
+@end example
+
+@node Managing Sessions
+@section Managing Sessions
+
+Use @code{pimacs-switch-session} to switch between active Pimacs chat
+sessions using completion.  Use @code{pimacs-list-sessions} to display all
+active chat sessions in a sortable tabulated list.  Press @kbd{RET} to visit
+the session on the current line and @kbd{g} to refresh the list.  Select a
+column header to sort by that column.
+
+Customize the list's columns and initial sort order with
+@code{pimacs-list-sessions-table} and @code{pimacs-list-sessions-sort-key}.
+
 @node Sandbox
 @chapter Sandbox
 
@@ -379,9 +406,12 @@ in another window
 
 @c custom-variables-start
 
-@defopt pimacs-use-ansi-colors @code{t}
+@defopt pimacs-status-widget-hidden-keys @code{nil}
 
-Whether to render ANSI colors in widget and status output.
+Status keys to hide from the default status widget.
+
+Hidden statuses remain available to @code{(:status STATUS-KEY ...)} components
+in @code{pimacs-header-line-format} and @code{pimacs-mode-line-format}.
 @end defopt
 
 @defopt pimacs-file-completion-backend @code{'project}
@@ -399,33 +429,6 @@ Maximum number of prompt history entries to keep.
 @defopt pimacs-resume-max-sessions @code{100}
 
 Maximum number of recent sessions to list when resuming a session.
-@end defopt
-
-@defopt pimacs-list-sessions-table
-
-@lisp
-'(("Session" . (:session_name face font-lock-function-name-face))
-  ("Provider" . :provider)
-  ("Model" . :model)
-  ("State" . (:agent_state face font-lock-keyword-face))
-  ("Context" . (:context_usage face shadow))
-  ("Messages" . :total_messages)
-  ("Cost" . (:cost face shadow))
-  ("Project" . (:project_root face shadow)))
-@end lisp
-
-Columns displayed by @code{pimacs-list-sessions}.
-
-Each entry is (HEADER . COMPONENT).  COMPONENT uses the same format as an
-entry in @code{pimacs-header-line-format}.
-@end defopt
-
-@defopt pimacs-list-sessions-sort-key @code{'("Session" . nil)}
-
-Initial sort order for @code{pimacs-list-sessions}.
-
-The car is a header from @code{pimacs-list-sessions-table}.  A non-nil cdr sorts
-in descending order.
 @end defopt
 
 @defopt pimacs-prompt-streaming-behavior @code{'followUp}
@@ -554,6 +557,38 @@ with the message plist to insert the custom message content.
 Whether to pop to the chat buffer after sending region, filename or errors.
 @end defopt
 
+@defopt pimacs-chat-keep-input-at-bottom @code{t}
+
+Whether to keep the input area at the bottom as new chat content is added.
+@end defopt
+
+@defopt pimacs-list-sessions-table
+
+@lisp
+'(("Session" . (:session_name face font-lock-type-face))
+  ("Provider" . :provider)
+  ("Model" . :model)
+  ("State" . (:agent_state face font-lock-constant-face))
+  ("Context" . (:context_usage face shadow))
+  ("Messages" . :total_messages)
+  ("Cost" . (:cost face shadow))
+  ("Project" . (:project_root face shadow)))
+@end lisp
+
+Columns displayed by @code{pimacs-list-sessions}.
+
+Each entry is (HEADER . COMPONENT).  COMPONENT uses the same format as an
+entry in @code{pimacs-header-line-format}.
+@end defopt
+
+@defopt pimacs-list-sessions-sort-key @code{'("Session" . nil)}
+
+Initial sort order for @code{pimacs-list-sessions}.
+
+The car is a header from @code{pimacs-list-sessions-table}.  A non-nil cdr sorts
+in descending order.
+@end defopt
+
 @defopt pimacs-sync-request-timeout @code{2}
 
 The number of seconds to wait for a sync response.
@@ -584,6 +619,11 @@ When non-nil, log all RPC JSON to @code{pimacs-log-rpc-file}.
 File to write RPC JSON log entries to.
 @end defopt
 
+@defopt pimacs-use-ansi-colors @code{t}
+
+Whether to render ANSI colors in widget and status output.
+@end defopt
+
 @defopt pimacs-header-line-format @code{'(:context_usage " (" :compaction_mode ")" :spacer "(" :provider ") " :model " • " :thinking_level)}
 
 Format of the Pimacs chat header line.
@@ -591,40 +631,79 @@ Format of the Pimacs chat header line.
 Strings are displayed literally.  Functions are called with the state
 plist and their returned values are displayed.  A keyword component can
 include text properties using @code{propertize} syntax.  For example:
-"@code{(:model face font-lock-function-name-face)}".
+"@code{(:model face font-lock-function-name-face)}".  A status component has
+form @code{(:status STATUS-KEY PROPERTY VALUE...)}; it displays the text set
+by an extension with STATUS-KEY and accepts optional text properties.
+For example: @code{(:status "xyz-status" face font-lock-warning-face)}.
 
 The following keywords are replaced with state information.
 
 Session state keywords:
-@code{:model}                    Model identifier.
-@code{:provider}                 Model provider.
-@code{:thinking_level}           Thinking level.
-@code{:session_name}             Session name.
-@code{:project_root}             Project root directory.
-@code{:compaction_mode}          @code{auto} or @code{manual}.
-@code{:message_count}            Message count.
-@code{:pending_message_count}    Pending message count.
+@table @code
+@item :model
+Model identifier.
+@item :provider
+Model provider.
+@item :thinking_level
+Thinking level.
+@item :session_name
+Session name.
+@item :project_root
+Project root directory.
+@item :compaction_mode
+@code{auto} or @code{manual}.
+@item :message_count
+Message count.
+@item :pending_message_count
+Pending message count.
+@end table
 
 Session statistics keywords:
-@code{:user_messages}            User message count.
-@code{:assistant_messages}       Assistant message count.
-@code{:tool_calls}               Tool call count.
-@code{:tool_results}             Tool result count.
-@code{:total_messages}           Total message count.
-@code{:input_tokens}             Input token count.
-@code{:output_tokens}            Output token count.
-@code{:cache_read_tokens}        Cache-read token count.
-@code{:cache_write_tokens}       Cache-write token count.
-@code{:total_tokens}             Total token count.
-@code{:cost}                     Session cost.
-@code{:context_usage}            Context tokens and context window.
-@code{:context_tokens}           Context token count.
-@code{:context_window}           Context window size.
+@table @code
+@item :user_messages
+User message count.
+@item :assistant_messages
+Assistant message count.
+@item :tool_calls
+Tool call count.
+@item :tool_results
+Tool result count.
+@item :total_messages
+Total message count.
+@item :input_tokens
+Input token count.
+@item :output_tokens
+Output token count.
+@item :cache_read_tokens
+Cache-read token count.
+@item :cache_write_tokens
+Cache-write token count.
+@item :cache_hit_percent
+Total cache hit percentage.
+@item :total_tokens
+Total token count.
+@item :cost
+Session cost.
+@item :context_usage
+Context tokens and context window.
+@item :context_tokens
+Context token count.
+@item :context_window
+Context window size.
+@end table
 
 UI keywords:
-@code{:agent_state}              Current agent state.
-@code{:spinner}                  Active agent spinner.
-@code{:spacer}                   Space that right-aligns all following entries.
+@table @code
+@item :agent_state
+Current agent state.
+@item :spinner
+Active agent spinner.
+@item :spacer
+Space that right-aligns all following entries.
+@end table
+
+Status components:
+@code{(:status STATUS-KEY ...)}  Extension status text for STATUS-KEY.
 
 Use at most one @code{:spacer}.
 @end defopt

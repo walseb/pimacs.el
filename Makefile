@@ -2,6 +2,9 @@ export EMACS ?= $(shell command -v emacs 2>/dev/null)
 CASK_DIR := $(shell cask package-directory)
 
 MATCH ?=
+PIMACS_VERSION := $(shell awk '/^;; Version:/ { print $$3; exit }' pimacs.el)
+PIMACS_DOC_SOURCES := pimacs-section.el pimacs-utils.el pimacs-state-line.el \
+	pimacs-core.el pimacs-agent.el pimacs-session.el pimacs.el
 
 $(CASK_DIR): Cask
 	cask install
@@ -18,7 +21,7 @@ setup: cask
 .PHONY: compile
 compile: cask
 	@cask emacs -batch -L . -L test \
-	  -f batch-byte-compile pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el; \
+	  -f batch-byte-compile pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs-session.el pimacs.el; \
 	  (ret=$$? ; cask clean-elc && exit $$ret)
 
 .PHONY: package-lint
@@ -26,7 +29,7 @@ package-lint: cask
 	@cask emacs -Q --batch \
 	  --eval "(setq package-lint-main-file \"pimacs.el\")" \
 	  -f package-lint-batch-and-exit \
-	  pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el
+	  pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs-session.el pimacs.el
 
 .PHONY: test
 test: compile
@@ -43,7 +46,7 @@ coverage: test integration
 
 .PHONY: format
 format:
-	@cask emacs --batch -L . -l pimacs-utils.el -l pimacs-state-line.el -l pimacs-core.el -l pimacs.el -l pimacs-section.el -l pimacs-edit.el -l pimacs-agent.el -l pimacs-tests.el -l pimacs-section-tests.el -l pimacs-state-line-tests.el -l integration/pimacs-integration-tests.el \
+	@cask emacs --batch -L . -l pimacs-utils.el -l pimacs-state-line.el -l pimacs-core.el -l pimacs.el -l pimacs-section.el -l pimacs-edit.el -l pimacs-agent.el -l pimacs-session.el -l pimacs-tests.el -l pimacs-section-tests.el -l pimacs-state-line-tests.el -l integration/pimacs-integration-tests.el \
 	  --eval " \
 	  (let ((inhibit-message t) \
                 (message-log-max nil)) \
@@ -52,7 +55,7 @@ format:
 	      (with-current-buffer (find-file-noselect f) \
 	        (indent-region (point-min) (point-max)) \
 	        (save-buffer))))" \
-          pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs.el pimacs-tests.el pimacs-section-tests.el pimacs-state-line-tests.el integration/pimacs-integration-tests.el
+          pimacs-utils.el pimacs-state-line.el pimacs-core.el pimacs-section.el pimacs-edit.el pimacs-agent.el pimacs-session.el pimacs.el pimacs-tests.el pimacs-section-tests.el pimacs-state-line-tests.el integration/pimacs-integration-tests.el
 
 
 .PHONY: sandbox
@@ -78,6 +81,7 @@ define ESCRIPT
   (insert-file-contents "pimacs-state-line.el")
   (insert-file-contents "pimacs-core.el")
   (insert-file-contents "pimacs-agent.el")
+  (insert-file-contents "pimacs-session.el")
   (insert-file-contents "pimacs.el")
   (while
       (ignore-errors
@@ -108,7 +112,23 @@ define ESCRIPT
                         (let ((inhibit-message t))
                           (indent-region (point-min) (point-max)))
                         (string-trim (buffer-string))))
-                     (doc (replace-regexp-in-string "`\\([^']*\\)'" "@code{\\1}" (cadr (cddr sexp)))))
+                     (raw-doc (cadr (cddr sexp)))
+                     (doc (replace-regexp-in-string "`\\([^']*\\)'" "@code{\\1}" raw-doc))
+                     (doc
+                      (replace-regexp-in-string
+                       "^@code{[^}\n]+}[ \t][ \t]+[^\n]*\n\\(?:@code{[^}\n]+}[ \t][ \t]+[^\n]*\n\\)+"
+                       (lambda (block)
+                         (save-match-data
+                           (with-temp-buffer
+                             (insert block)
+                             (goto-char (point-min))
+                             (while (re-search-forward "^@code{\\([^}\n]+\\)}[ \t][ \t]+\\([^\n]*\\)" nil t)
+                               (replace-match (format "@item %s\n%s"
+                                                      (match-string 1)
+                                                      (match-string 2))
+                                              t t))
+                             (concat "@table @code\n" (buffer-string) "@end table\n"))))
+                       doc)))
                 (if (string-match-p "\n" default-str)
                     (princ (format "@defopt %s\n\n@lisp\n%s\n@end lisp\n\n%s\n@end defopt\n\n" name default-str doc))
                   (princ (format "@defopt %s @code{%s}\n\n%s\n@end defopt\n\n" name default-str doc)))))
@@ -127,10 +147,44 @@ docs-lint:
 	  --eval "(checkdoc-file \"pimacs-state-line.el\")" \
 	  --eval "(checkdoc-file \"pimacs-edit.el\")" \
 	  --eval "(checkdoc-file \"pimacs-agent.el\")" \
-	  --eval "(checkdoc-file \"pimacs-core.el\")" 2>&1 | grep '^pimacs[.-]' | grep -v 'All variables and subroutines might as well have a documentation string' || true
+	  --eval "(checkdoc-file \"pimacs-core.el\")" \
+	  --eval "(checkdoc-file \"pimacs-session.el\")" 2>&1 | grep '^pimacs[.-]' | grep -v 'All variables and subroutines might as well have a documentation string' || true
 
 .PHONY: docs
-docs: pimacs.info
+docs: docs/index.html docs/changelog.html
+
+pimacs.info: Makefile pimacs.texi $(PIMACS_DOC_SOURCES)
 	@ruby -e 'txt = IO.read("pimacs.texi").split("@c custom-variables-start")[0] + "@c custom-variables-start\n\n" + `$(EMACS) -Q --batch --eval "$$ESCRIPT"` + "@c custom-variables-end" + IO.read("pimacs.texi").split("@c custom-variables-end")[1]; File.write("pimacs.texi", txt)'
-	@makeinfo pimacs.texi
-	@makeinfo --no-number-sections --html --no-split -o ./docs/index.html pimacs.texi
+	@makeinfo -D 'VERSION $(PIMACS_VERSION)' -o pimacs.info pimacs.texi
+
+docs/index.html: pimacs.info
+	@makeinfo -D 'VERSION $(PIMACS_VERSION)' --no-number-sections --html --no-split -o $@ pimacs.texi
+
+docs/changelog.html: CHANGELOG.md docs/changelog-head.html docs/changelog-template.html docs/global.css
+	@pandoc --from=gfm --to=html5 --standalone \
+	  --metadata title="Pimacs Changelog" \
+	  --template=docs/changelog-template.html \
+	  --include-in-header=docs/changelog-head.html --css=global.css \
+	  --output=$@ $<
+
+define run-verify-task
+	@printf '%s\n' 'make $(1)'
+	@$(MAKE) --no-print-directory --silent $(1)
+endef
+
+.PHONY: verify
+verify:
+	$(call run-verify-task,format)
+	$(call run-verify-task,test)
+	$(call run-verify-task,docs)
+	$(call run-verify-task,docs-lint)
+	$(call run-verify-task,package-lint)
+
+.PHONY: verify-full
+verify-full:
+	$(call run-verify-task,format)
+	$(call run-verify-task,test)
+	$(call run-verify-task,docs)
+	$(call run-verify-task,integration)
+	$(call run-verify-task,docs-lint)
+	$(call run-verify-task,package-lint)

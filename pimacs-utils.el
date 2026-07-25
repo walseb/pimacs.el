@@ -4,7 +4,6 @@
 
 ;; This program is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
-
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
@@ -52,6 +51,13 @@
     (format "%.1fk" (/ n 1000.0)))
    (t
     (number-to-string n))))
+
+(defun pimacs--format-number-fixed (number decimal-places)
+  (string-trim-right
+   (string-trim-right
+    (format (format "%%.%df" decimal-places) number)
+    "0+")
+   "[.]"))
 
 (defun pimacs--short-uuid (uuid)
   (when (stringp uuid)

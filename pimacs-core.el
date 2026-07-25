@@ -4,7 +4,6 @@
 
 ;; This program is free software: you can redistribute it and/or modify it
 ;; under the terms of the GNU General Public License as published by
-
 ;; the Free Software Foundation, either version 3 of the License, or
 ;; (at your option) any later version.
 
@@ -22,11 +21,22 @@
 
 ;;; Code:
 
+(defgroup pimacs nil
+  "Emacs client for Pi."
+  :prefix "pimacs-"
+  :group 'tools)
+
 (require 'pimacs-utils)
 (require 'project)
 
+(defcustom pimacs-use-ansi-colors t
+  "Whether to render ANSI colors in widget and status output."
+  :type 'boolean
+  :group 'pimacs)
+
 (pimacs--def-permanent-buffer-local pimacs--project-root nil)
 (pimacs--def-permanent-buffer-local pimacs--project-key nil)
+(pimacs--def-permanent-buffer-local pimacs--status-texts nil)
 
 (defun pimacs--project-root ()
   (or
@@ -45,7 +55,6 @@
 
 (defun pimacs--agent-buffer-name ()
   (format "*pimacs-agent:%s*" pimacs--project-key))
-
 
 (provide 'pimacs-core)
 

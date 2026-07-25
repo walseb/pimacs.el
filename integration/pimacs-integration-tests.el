@@ -82,8 +82,12 @@
          (pimacs--force-update-header-line)
          (pimacs-check-tape ,scenario ".txt"
                             (buffer-substring (point-min) (point-max)))
-         (pimacs-check-tape ,scenario "-header.txt"
-                            (pimacs--format-state-line pimacs-header-line-format)))
+         (pimacs-check-tape
+          ,scenario "-header.txt"
+          (replace-regexp-in-string
+           "%%" "%"
+           (pimacs--format-state-line pimacs-header-line-format)
+           t t)))
 
        (pimacs-quit-chat))))
 
@@ -235,6 +239,7 @@
     (setq-local pimacs-header-line-format
                 '("tokens=" :input_tokens "/" :output_tokens
                   " cache=" :cache_read_tokens "/" :cache_write_tokens
+                  " hit=" :cache_hit_percent
                   :spacer
                   "cost=" :cost))
     (pimacs-send-prompt-and-wait "/name clone-test")
@@ -418,10 +423,17 @@
                   :spacer
                   "compaction=" :compaction_mode))
     (pimacs-send-prompt-and-wait "hello")
-    (pimacs-send-prompt "/reload")
-    (sleep-for 3)
+    (let (chat-buffer)
+      (pimacs--with-chat-buffer
+        (setq chat-buffer (current-buffer)))
+      (pimacs-send-prompt "/rpc-editor")
+      (pimacs-drain-process-output)
+      (should (get-buffer "*pimacs-edit*"))
+      (with-current-buffer chat-buffer
+        (pimacs-send-prompt "/reload"))
+      (sleep-for 3)
+      (should-not (get-buffer "*pimacs-edit*")))
     (pimacs-send-prompt-and-wait "hello")))
-
 
 (ert-deftest pimacs-extension-ui ()
   (pimacs-with-integration-project "extension-ui"
