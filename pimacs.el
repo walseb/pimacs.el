@@ -397,7 +397,7 @@ with the message plist to insert the custom message content."
         (widget-get pimacs--prompt-widget :from))))
 
 (defmacro pimacs--widget-save-excursion (&rest body)
-  "Insert before PROMPT-WIDGET without moving point.  BODY is the content."
+  "Insert before PROMPT-WIDGET and restore focus.  BODY is the content."
   (declare (indent 0))
   `(let ((inhibit-read-only t))
      (save-excursion
