@@ -53,6 +53,7 @@
 (require 'pimacs-utils)
 (require 'pimacs-section)
 (require 'pimacs-edit)
+(require 'pimacs-hashline-diff)
 (require 'pimacs-agent)
 (require 'pimacs-state-line)
 (require 'pimacs-session)
