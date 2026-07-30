@@ -894,6 +894,11 @@ with the message plist to insert the custom message content."
   (when-let ((command (plist-get args :command)))
     (insert (pimacs--render-content "tmp.sh" command))))
 
+(defun pimacs--bash-command-header (command)
+  "Return a single-line section header for bash COMMAND."
+  (pimacs--section-header
+   (replace-regexp-in-string "[[:space:]\n]+" " " command)))
+
 (defun pimacs--insert-bash-result (content details _args)
   (let* ((exit-code (plist-get details :exitCode))
          (cancelled (plist-get details :cancelled))
@@ -1043,7 +1048,11 @@ with the message plist to insert the custom message content."
       (pimacs-section--set-info section (make-pimacs-section-tool-call-info
                                          :tool-name tool-name
                                          :args args
-                                         :header (pimacs--section-header (substring-no-properties formatted-args)))))))
+                                         :header (if (equal tool-name "bash")
+                                                     (pimacs--bash-command-header
+                                                      (or (plist-get args :command) ""))
+                                                   (pimacs--section-header
+                                                    (substring-no-properties formatted-args))))))))
 
 (defun pimacs--insert-tool-result (tool-name content is-error &optional details args)
   (if (eq is-error t)
