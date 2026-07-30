@@ -892,15 +892,11 @@ with the message plist to insert the custom message content."
 ;; bash
 (defun pimacs--insert-bash-args (args)
   (when-let ((command (plist-get args :command)))
-    (insert (pimacs--render-content "tmp.sh" command))))
-
-(defun pimacs--single-line-bash-command (command)
-  "Return COMMAND with whitespace collapsed onto one line."
-  (string-trim (replace-regexp-in-string "[[:space:]\n]+" " " command)))
-
-(defun pimacs--bash-command-header (command)
-  "Return a single-line section header for bash COMMAND."
-  (pimacs--section-header (pimacs--single-line-bash-command command)))
+    ;; Keep the command on the section's first physical line so it remains
+    ;; visible when the surrounding block is folded.
+    (insert (pimacs--render-content
+             "tmp.sh"
+             (replace-regexp-in-string "\n" "\\n" command nil t)))))
 
 (defun pimacs--insert-bash-result (content details _args)
   (let* ((exit-code (plist-get details :exitCode))
@@ -1043,25 +1039,15 @@ with the message plist to insert the custom message content."
 
 (defun pimacs--insert-tool-call (section tool-name args)
   "Format and insert a tool call into SECTION for TOOL-NAME with ARGS."
-  (let* ((formatted-args (pimacs--format-tool-args tool-name args))
-         (bash-p (equal tool-name "bash"))
-         (bash-command (and bash-p (plist-get args :command))))
+  (let ((formatted-args (pimacs--format-tool-args tool-name args)))
     (pimacs--widget-save-excursion
       (pimacs-section--insert-section section
         (pimacs--insert-tool-name tool-name)
         (insert formatted-args))
-      ;; Auto-hiding preserves only the first line, which makes most of a
-      ;; multiline command disappear.  Keep those sections expanded instead.
-      (when (and bash-command (string-match-p "\n" bash-command))
-        (pimacs-section--set-visibility section :show))
       (pimacs-section--set-info section (make-pimacs-section-tool-call-info
                                          :tool-name tool-name
                                          :args args
-                                         :header (if bash-p
-                                                     (pimacs--bash-command-header
-                                                      (or bash-command ""))
-                                                   (pimacs--section-header
-                                                    (substring-no-properties formatted-args))))))))
+                                         :header (pimacs--section-header (substring-no-properties formatted-args)))))))
 
 (defun pimacs--insert-tool-result (tool-name content is-error &optional details args)
   (if (eq is-error t)
