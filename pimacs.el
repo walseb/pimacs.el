@@ -892,11 +892,7 @@ with the message plist to insert the custom message content."
 ;; bash
 (defun pimacs--insert-bash-args (args)
   (when-let ((command (plist-get args :command)))
-    ;; Keep the command on the section's first physical line so it remains
-    ;; visible when the surrounding block is folded.
-    (insert (pimacs--render-content
-             "tmp.sh"
-             (replace-regexp-in-string "\n" "\\n" command nil t)))))
+    (insert (pimacs--render-content "tmp.sh" command))))
 
 (defun pimacs--insert-bash-result (content details _args)
   (let* ((exit-code (plist-get details :exitCode))
