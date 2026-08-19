@@ -1,4 +1,4 @@
-Switched to model: (fixture) qwen3.5:0.8b
+Switched to model: (fixture) gemma4:12b
 
 Thinking level set to: low
 
@@ -23,5 +23,6 @@ assistant> Hello! It's great to see you again. 😊
 
 How can I assist you today?
 
-  user> hello again
+
+ user> hello again
   

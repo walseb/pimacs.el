@@ -13,7 +13,7 @@
 ;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -75,6 +75,10 @@
   process buffer function)
 
 (defvar pimacs--event-listeners (make-hash-table :test 'equal))
+(defvar pimacs--event-batch-listeners (make-hash-table :test 'equal))
+
+(defconst pimacs--batchable-event-types '("message_update"))
+(defconst pimacs--event-batch-size 10)
 
 (defvar pimacs--request-counter 0)
 
@@ -98,18 +102,84 @@
             (funcall fn response))))
       (remhash request-id pimacs--response-callbacks))))
 
+(defun pimacs--dispatch-event-listener (listener event)
+  (when (buffer-live-p (car listener))
+    (with-current-buffer (car listener)
+      (funcall (cdr listener) event))))
+
+(defun pimacs--dispatch-event-listeners (listeners event)
+  (dolist (listener (mapcar #'cdr listeners))
+    (pimacs--dispatch-event-listener listener event)))
+
 (defun pimacs--dispatch-event (event)
   (let ((key pimacs--project-key))
-    (when-let (all-listener (gethash (cons key t) pimacs--event-listeners))
-      (with-current-buffer (car all-listener)
-        (apply (cdr all-listener) (list event))))
-    (when-let (listener (gethash (cons key (plist-get event :type)) pimacs--event-listeners))
-      (with-current-buffer (car listener)
-        (apply (cdr listener) (list event))))))
+    (pimacs--dispatch-event-listeners
+     (gethash (cons key t) pimacs--event-listeners) event)
+    (pimacs--dispatch-event-listeners
+     (gethash (cons key (plist-get event :type)) pimacs--event-listeners) event)))
 
-(defun pimacs--set-event-listener (name listener)
-  "Set event listener NAME for all events.  LISTENER is the callback."
-  (puthash (cons pimacs--project-key name) (cons (current-buffer) listener) pimacs--event-listeners))
+(defun pimacs--dispatch-event-batch (events)
+  (let* ((key pimacs--project-key)
+         (type (plist-get (car events) :type))
+         (listeners (gethash (cons key type) pimacs--event-batch-listeners)))
+    (if listeners
+        (progn
+          (dolist (event events)
+            (pimacs--dispatch-event-listeners
+             (gethash (cons key t) pimacs--event-listeners) event))
+          (pimacs--dispatch-event-listeners listeners events))
+      (dolist (event events)
+        (pimacs--dispatch-event event)))))
+
+(defun pimacs--set-event-subscriber (table name id listener)
+  (let* ((key (cons pimacs--project-key name))
+         (subscribers (gethash key table))
+         (entry (cons (current-buffer) listener)))
+    (if (assoc id subscribers)
+        (setf (alist-get id subscribers nil nil #'equal) entry)
+      (setq subscribers (append subscribers (list (cons id entry)))))
+    (puthash key subscribers table)))
+
+(defun pimacs--remove-event-subscriber (table name id)
+  (let* ((key (cons pimacs--project-key name))
+         (subscribers (gethash key table)))
+    (setf (alist-get id subscribers nil t #'equal) nil)
+    (if subscribers
+        (puthash key subscribers table)
+      (remhash key table))))
+
+(defun pimacs--set-event-listener (name id listener)
+  (pimacs--set-event-subscriber pimacs--event-listeners name id listener))
+
+(defun pimacs--remove-event-listener (name id)
+  (pimacs--remove-event-subscriber pimacs--event-listeners name id))
+
+(defun pimacs--set-event-batch-listener (name id listener)
+  (pimacs--set-event-subscriber pimacs--event-batch-listeners name id listener))
+
+(defun pimacs--remove-event-batch-listener (name id)
+  (pimacs--remove-event-subscriber pimacs--event-batch-listeners name id))
+
+(defun pimacs--batchable-event-p (event)
+  (member (plist-get event :type) pimacs--batchable-event-types))
+
+(defun pimacs--dispatch-responses (process responses)
+  (let (batch)
+    (dolist (response responses)
+      (let ((batchable (pimacs--batchable-event-p response)))
+        (if (and batchable
+                 batch
+                 (equal (plist-get response :type) (plist-get (car batch) :type))
+                 (< (length batch) pimacs--event-batch-size))
+            (push response batch)
+          (when batch
+            (pimacs--dispatch-event-batch (nreverse batch))
+            (setq batch nil))
+          (if batchable
+              (push response batch)
+            (pimacs--dispatch process response)))))
+    (when batch
+      (pimacs--dispatch-event-batch (nreverse batch)))))
 
 (defun pimacs--dispatch (process response)
   (cl-case (intern (plist-get response :type))
@@ -155,53 +225,76 @@
 (defun pimacs--net-filter (process data)
   (with-current-buffer (process-buffer process)
     (goto-char (point-max))
-    (insert (format "%s" data)))
+    (insert data))
   (pimacs--decode-response process))
 
 (defun pimacs--enough-response-p ()
   (goto-char (point-min))
   (save-excursion
-    (when (search-forward "{")
+    (when (search-forward "{" nil t)
       (search-forward "\n" nil t))))
 
 (defun pimacs--decode-response (process)
   (with-current-buffer (process-buffer process)
-    (when (pimacs--enough-response-p)
-      (search-forward "{")
-      (backward-char 1)
-      (let* ((raw-start (point))
-             (response (pimacs--json-read-object)))
-        (when pimacs-log-rpc
-          (pimacs--maybe-log-rpc "output" (buffer-substring-no-properties raw-start (point))))
-        (delete-region (point-min) (point))
-        (when response
-          (ignore-error quit
-            (pimacs--dispatch process response))))
-      (when (>= (buffer-size) 16)
-        (pimacs--decode-response process)))))
+    (let (responses)
+      (while (pimacs--enough-response-p)
+        (search-forward "{")
+        (backward-char 1)
+        (let ((raw-start (point)))
+          (condition-case err
+              (let ((response (pimacs--json-read-object)))
+                (when pimacs-log-rpc
+                  (pimacs--maybe-log-rpc "output" (buffer-substring-no-properties raw-start (point))))
+                (delete-region (point-min) (point))
+                (when response
+                  (push response responses)))
+            (json-parse-error
+             (goto-char raw-start)
+             (message "pimacs JSON parse error: %s\n  %s"
+                      (error-message-string err)
+                      (buffer-substring-no-properties
+                       (line-beginning-position) (point-max)))
+             (forward-line 1)
+             (delete-region (point-min) (point))))))
+      (ignore-error quit
+        (pimacs--dispatch-responses process (nreverse responses))))))
 
 (defun pimacs--agent-version ()
   (with-temp-buffer
     (let* ((process-arguments (append pimacs-flags '("--version")))
            (command-line (mapconcat #'shell-quote-argument (cons pimacs-executable process-arguments) " "))
-           (exit-code (apply #'call-process pimacs-executable nil (current-buffer) nil process-arguments)))
-      (if (zerop exit-code)
-          (string-trim (buffer-string))
-        (let ((output (buffer-string)))
-          (with-current-buffer (get-buffer-create "*pimacs-version-error*")
-            (let ((inhibit-read-only t))
-              (erase-buffer)
-              (insert (format "Failed to run `%s`.\n" command-line))
-              (insert (format "\nExit code: %d\n" exit-code))
-              (insert (format "\nOutput:\n%s" output)))
-            (special-mode)
-            (goto-char (point-min))
-            (pop-to-buffer (current-buffer)))
-          (error "Failed to run `%s' (exit code %d)" command-line exit-code))))))
+           (stderr-file (make-temp-file "pimacs-version-stderr-")))
+      (unwind-protect
+          (let ((exit-code (apply #'call-process pimacs-executable nil
+                                  (list (current-buffer) stderr-file) nil
+                                  process-arguments)))
+            (if (zerop exit-code)
+                (string-trim (buffer-string))
+              (let ((output (buffer-string))
+                    (stderr (with-temp-buffer
+                              (insert-file-contents stderr-file)
+                              (buffer-string))))
+                (with-current-buffer (get-buffer-create "*pimacs-version-error*")
+                  (let ((inhibit-read-only t))
+                    (erase-buffer)
+                    (insert (format "Failed to run `%s`.\n" command-line))
+                    (insert (format "\nExit code: %d\n" exit-code))
+                    (insert (format "\nOutput:\n%s" output))
+                    (insert (format "\nStderr:\n%s" stderr)))
+                  (special-mode)
+                  (goto-char (point-min))
+                  (pop-to-buffer (current-buffer)))
+                (error "Failed to run `%s' (exit code %d)" command-line exit-code))))
+        (delete-file stderr-file)))))
+
+(defun pimacs--agent-version-compatible-p (version)
+  (condition-case nil
+      (version-list-<= (version-to-list pimacs--minimum-version)
+                       (version-to-list version))
+    (error nil)))
 
 (defun pimacs--check-agent-version (version)
-  (unless (version-list-<= (version-to-list pimacs--minimum-version)
-                           (version-to-list version))
+  (unless (pimacs--agent-version-compatible-p version)
     (error "Pi agent version %s is older than minimum supported version %s"
            version pimacs--minimum-version)))
 
@@ -215,16 +308,23 @@
     (message "(%s) Starting pimacs version %s..." (pimacs--project-name) version)
     (let* ((process-environment (append pimacs-process-environment process-environment))
            (buf (generate-new-buffer (pimacs--agent-buffer-name)))
-           ;; Use a pipe to communicate with the subprocess. This fixes a hang
-           ;; when a >1k message is sent on macOS.
-           (process-connection-type nil)
            (process-arguments (append pimacs-flags '("--mode" "rpc")))
            (process
-            (apply #'start-file-process "pi" buf pimacs-executable process-arguments)))
+            (make-process :name "pi"
+                          :buffer buf
+                          :command (cons pimacs-executable process-arguments)
+                          ;; Use a pipe to communicate with the subprocess. This fixes a hang
+                          ;; when a >1k message is sent on macOS.
+                          :connection-type 'pipe
+                          :coding 'utf-8-unix
+                          :stderr (get-buffer-create "*pimacs-stderr*")
+                          :file-handler t)))
       (set-process-coding-system process 'utf-8-unix 'utf-8-unix)
       (set-process-filter process #'pimacs--net-filter)
       (set-process-sentinel process #'pimacs--net-sentinel)
       (set-process-query-on-exit-flag process nil)
+      (when-let ((stderr-process (get-process (concat (process-name process) " stderr"))))
+        (set-process-query-on-exit-flag stderr-process nil))
       (with-current-buffer (process-buffer process)
         (buffer-disable-undo)
         (setq-local pimacs--project-key key))

@@ -4,8 +4,12 @@
 *~
 sandbox
 integration/fixture/node_modules
+scripts/node_modules
 integration/project/agent/sessions
+integration/project/agent/models-store.json
 coverage-final.json
 .pi
 docs/index.html
 docs/changelog.html
+docs/index.md
+docs/changelog.md

@@ -2,5 +2,5 @@
 .github
 integration
 Makefile
-pimacs-section-tests.el
-pimacs-tests.el
+scripts
+test

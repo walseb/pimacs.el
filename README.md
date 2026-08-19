@@ -1,10 +1,14 @@
 # Pimacs
 
-[![codecov](https://codecov.io/gh/ananthakumaran/pimacs.el/graph/badge.svg?token=JOXNJXK8OH)](https://codecov.io/gh/ananthakumaran/pimacs.el)
+[![codecov](https://codecov.io/gh/ananthakumaran/pimacs.el/graph/badge.svg?token=JOXNJXK8OH)](https://codecov.io/gh/ananthakumaran/pimacs.el) [![MELPA Stable](https://stable.melpa.org/packages/pimacs-badge.svg)](https://stable.melpa.org/#/pimacs)
 
 An Emacs client for [Pi Coding Agent](https://pi.dev/)
 
-![screenshot](docs/screenshot.png)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="docs/screenshot-dark.png">
+  <source media="(prefers-color-scheme: light)" srcset="docs/screenshot-light.png">
+  <img alt="Pimacs screenshot" src="docs/screenshot-light.png">
+</picture>
 
 ## Setup
 
@@ -19,12 +23,14 @@ pi
 
 ### Install `pimacs.el`
 
+Pimacs is available from [MELPA Stable](https://stable.melpa.org/), which is recommended for installation. Add it to your package archives, then install with `use-package`:
+
 ```elisp
+(add-to-list 'package-archives
+             '("melpa-stable" . "https://stable.melpa.org/packages/") t)
+
 (use-package pimacs
-  :ensure t
-  :vc (:url "git@github.com:ananthakumaran/pimacs.el.git"
-       :rev "v0.2.0")
-  :commands (pimacs-chat))
+  :ensure t)
 ```
 
 ## Usage

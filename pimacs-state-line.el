@@ -13,7 +13,7 @@
 ;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -197,7 +197,7 @@ See `pimacs-header-line-format' for available components."
    (pimacs--plist-get state :sessionStats :contextUsage :contextWindow)))
 
 (defun pimacs--format-state-line-compaction-mode (state)
-  (if (plist-get state :autoCompactionEnabled) "auto" "manual"))
+  (if (eq (plist-get state :autoCompactionEnabled) t) "auto" "manual"))
 
 (defun pimacs--format-state-line-user-messages (state)
   (pimacs--format-state-line-value (pimacs--plist-get state :sessionStats :userMessages)))
@@ -265,9 +265,7 @@ See `pimacs-header-line-format' for available components."
               ((stringp status-key))
               (text (gethash status-key status-texts)))
     (let ((text (replace-regexp-in-string "[\n\r]+" " " text)))
-      (if pimacs-use-ansi-colors
-          (ansi-color-apply text)
-        (ansi-color-filter-apply text)))))
+      (pimacs--apply-ansi-colors text))))
 
 (defconst pimacs--state-line-formatters
   '((:model . pimacs--format-state-line-model)

@@ -34,7 +34,7 @@ Compaction set to: manual
 
 Compaction set to: auto
 
-Switched to model: (fixture) qwen3.5:0.8b
+Switched to model: (fixture) gemma4:12b
 
 Thinking level set to: minimal
 
@@ -48,5 +48,6 @@ Steering mode set to: One at a time
 
 Follow-up mode set to: All
 
-  user> 
+
+ user> 
   

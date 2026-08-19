@@ -13,7 +13,7 @@
 ;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -28,11 +28,17 @@
 
 (require 'pimacs-utils)
 (require 'project)
+(require 'ansi-color)
 
 (defcustom pimacs-use-ansi-colors t
   "Whether to render ANSI colors in widget and status output."
   :type 'boolean
   :group 'pimacs)
+
+(defun pimacs--apply-ansi-colors (text)
+  (if pimacs-use-ansi-colors
+      (ansi-color-apply text)
+    (ansi-color-filter-apply text)))
 
 (pimacs--def-permanent-buffer-local pimacs--project-root nil)
 (pimacs--def-permanent-buffer-local pimacs--project-key nil)

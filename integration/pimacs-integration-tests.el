@@ -39,7 +39,7 @@
 (defconst pimacs-silenced-integration-message-patterns
   '("^(.*) Starting pimacs version .+\.\.\.$"
     "^(.*) pimacs agent started successfully\.$"
-    "^(.*) pimacs exits: killed\.$"
+    "^(.*) pimacs exits: killed\\(: [0-9]+\\)?\\.$"
     "^Copied last assistant message to clipboard\.$"))
 
 (defmacro pimacs-with-silenced-integration-messages (&rest body)
@@ -69,27 +69,31 @@
                                          (concat "FIXTURE_SCENARIO=" ,scenario)
                                          (concat "PI_CODING_AGENT_DIR=" pimacs-project-agent-directory)
                                          (concat "FIXTURE_MODE=" (pimacs-fixture-mode))))
-            (pimacs-flags (list "--tools" "read,bash,edit,write,grep,find,ls" "--extension" (expand-file-name "fixture" pimacs-integration-directory))))
+            (pimacs-flags (list "--tools" "read,bash,edit,write,grep,find,ls,cowsay" "--extension" (expand-file-name "fixture" pimacs-integration-directory))))
        (let ((sessions-dir (expand-file-name "sessions" pimacs-project-agent-directory)))
          (when (file-exists-p sessions-dir)
            (delete-directory sessions-dir t)
            (make-directory sessions-dir)))
        (pimacs-chat)
        (sleep-for 2)
-       ,@body
-       (pimacs-drain-process-output)
-       (pimacs--with-chat-buffer
-         (pimacs--force-update-header-line)
-         (pimacs-check-tape ,scenario ".txt"
-                            (buffer-substring (point-min) (point-max)))
-         (pimacs-check-tape
-          ,scenario "-header.txt"
-          (replace-regexp-in-string
-           "%%" "%"
-           (pimacs--format-state-line pimacs-header-line-format)
-           t t)))
-
-       (pimacs-quit-chat))))
+       ;; Always quit the chat, even when a check fails, so the agent
+       ;; process (and its proxay child) is torn down and the next test
+       ;; starts with a fresh proxy instead of reusing stale state.
+       (unwind-protect
+           (progn
+             ,@body
+             (pimacs-drain-process-output)
+             (pimacs--with-chat-buffer
+               (pimacs--force-update-header-line)
+               (pimacs-check-tape ,scenario ".txt"
+                                  (buffer-substring (point-min) (point-max)))
+               (pimacs-check-tape
+                ,scenario "-header.txt"
+                (replace-regexp-in-string
+                 "%%" "%"
+                 (pimacs--format-state-line pimacs-header-line-format)
+                 t t))))
+         (pimacs-quit-chat)))))
 
 (defvar pimacs-settle-time (if (getenv "CI") 1 0.1))
 (defvar pimacs-poll-interval (if (getenv "CI") 0.5 0.05))
@@ -164,6 +168,32 @@
   (pimacs-send-prompt prompt)
   (pimacs-drain-process-output))
 
+(defun pimacs-wait-until (predicate &optional timeout)
+  (let ((timeout (or timeout 120))
+        (start (current-time)))
+    (while (and (not (funcall predicate))
+                (< (time-to-seconds (time-subtract (current-time) start)) timeout))
+      (accept-process-output nil pimacs-poll-interval))
+    (should (funcall predicate))))
+
+(defmacro pimacs-send-prompt-when-agent-starts (prompt &rest body)
+  (declare (indent 1))
+  `(let ((started nil))
+     (unwind-protect
+         (progn
+           (pimacs--with-chat-buffer
+             (pimacs--set-event-listener
+              t 'pimacs-integration-tests
+              (lambda (event)
+                (when (and (not started)
+                           (equal (plist-get event :type) "agent_start"))
+                  (setq started t)
+                  ,@body))))
+           (pimacs-send-prompt ,prompt)
+           (pimacs-wait-until (lambda () started)))
+       (pimacs--with-chat-buffer
+         (pimacs--remove-event-listener t 'pimacs-integration-tests)))))
+
 (defun pimacs-assert-prompt (buffer expected)
   (with-current-buffer buffer
     (should (equal (widget-value pimacs--prompt-widget) expected))))
@@ -176,6 +206,10 @@
           (append (listify-key-sequence ,input)
                   unread-command-events)))
      ,@body))
+
+(ert-deftest pimacs-custom-tool ()
+  (pimacs-with-integration-project "custom-tool"
+    (pimacs-send-prompt-and-wait "use the cowsay tool to say hello")))
 
 (ert-deftest pimacs-basics ()
   (pimacs-with-integration-project "basics"
@@ -207,7 +241,7 @@
       (pimacs-send-prompt-and-wait "/set-auto-compaction"))
     (pimacs-with-minibuffer-input "y"
       (pimacs-send-prompt-and-wait "/set-auto-compaction"))
-    (pimacs-with-minibuffer-input "(fixture) qwen3.5:0.8b"
+    (pimacs-with-minibuffer-input "(fixture) gemma4:12b"
       (pimacs-send-prompt-and-wait "/model"))
     (pimacs-with-minibuffer-input "minimal (Very brief reasoning ~1k tokens)"
       (pimacs-send-prompt-and-wait "/set-thinking-level"))
@@ -295,9 +329,9 @@
                 '(:spacer
                   "agent=" :agent_state
                   " thinking=" :thinking_level))
-    (pimacs-send-prompt "hello")
-    (pimacs-send-prompt "follow up 1")
-    (pimacs-send-prompt "follow up 2")
+    (pimacs-send-prompt-when-agent-starts "hello"
+      (pimacs-send-prompt "follow up 1")
+      (pimacs-send-prompt "follow up 2"))
     (pimacs-drain-process-output)
     (pimacs-send-prompt-and-wait "hello again")))
 
@@ -307,9 +341,9 @@
                 '("provider=" :provider
                   :spacer
                   "thinking=" :thinking_level))
-    (pimacs-send-prompt "hello")
-    (pimacs-send-prompt-alternate "hello 1")
-    (pimacs-send-prompt-alternate "hello 2")
+    (pimacs-send-prompt-when-agent-starts "hello"
+      (pimacs-send-prompt-alternate "hello 1")
+      (pimacs-send-prompt-alternate "hello 2"))
     (pimacs-drain-process-output)
     (pimacs-send-prompt-and-wait "hello again")))
 
@@ -481,4 +515,12 @@
 
     (pimacs-send-prompt-and-wait "/rpc-set-title")))
 
+(ert-deftest pimacs-bash-ansi-colors ()
+  (pimacs-with-integration-project "bash-ansi-colors"
+    (pimacs-send-prompt-and-wait
+     "!printf '\\033[31mred\\033[0m\\n'")
+    (pimacs-send-prompt-and-wait
+     "!!printf '\\033[31mred\\033[0m\\n'")
+    (pimacs-send-prompt-and-wait
+     "Run exactly this bash command: printf '\\033[31mred\\033[0m\\n'")))
 ;;; pimacs-tests.el ends here

@@ -13,7 +13,7 @@
 ;; General Public License for more details.
 
 ;; You should have received a copy of the GNU General Public License
-;; along with this program.  If not, see <http://www.gnu.org/licenses/>.
+;; along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
 ;;; Commentary:
 
@@ -24,13 +24,7 @@
 (require 'subr-x)
 (require 'widget)
 (require 'ffap)
-(require 'markdown-mode)
 (require 'diff-mode)
-
-(defcustom pimacs-align-markdown-tables t
-  "Whether to align markdown tables while rendering assistant output."
-  :type 'boolean
-  :group 'pimacs)
 
 (defun pimacs--json-read-object ()
   (json-parse-buffer :object-type 'plist :null-object 'json-null :false-object 'json-false :array-type 'list))
@@ -59,9 +53,45 @@
     "0+")
    "[.]"))
 
+(defun pimacs--fill-string (string)
+  (with-temp-buffer
+    (insert string)
+    (goto-char (point-min))
+    (while (not (eobp))
+      (fill-region (point) (line-end-position))
+      (forward-line 1))
+    (buffer-string)))
+
 (defun pimacs--short-uuid (uuid)
   (when (stringp uuid)
     (substring uuid -8)))
+
+(defun pimacs--buffer-string-common-prefix-length (buffer start end string)
+  (with-current-buffer buffer
+    (let ((buffer-position start)
+          (string-position 0)
+          (string-end (length string))
+          done)
+      (while (and (not done)
+                  (< buffer-position end)
+                  (< string-position string-end))
+        (if (not (equal (text-properties-at buffer-position buffer)
+                        (text-properties-at string-position string)))
+            (setq done t)
+          (let* ((buffer-property-end
+                  (next-property-change buffer-position buffer end))
+                 (string-property-end
+                  (next-property-change string-position string string-end))
+                 (span-end
+                  (+ buffer-position
+                     (min (- buffer-property-end buffer-position)
+                          (- string-property-end string-position)))))
+            (while (and (< buffer-position span-end) (not done))
+              (if (= (char-after buffer-position) (aref string string-position))
+                  (setq buffer-position (1+ buffer-position)
+                        string-position (1+ string-position))
+                (setq done t))))))
+      (- buffer-position start))))
 
 (defmacro pimacs--def-permanent-buffer-local (name &optional init-value)
   "Declare NAME as buffer local variable with optional INIT-VALUE."
@@ -92,9 +122,6 @@
   "Return the name of KEYWORD as a string without the leading colon."
   (substring (symbol-name keyword) 1))
 
-(defun pimacs--current-column-1-based ()
-  "Return the current column as a 1-based number."
-  (1+ (current-column)))
 
 (defun pimacs--seconds-elapsed-since (time)
   (time-to-seconds (time-subtract (current-time) time)))
@@ -153,7 +180,7 @@ PRED is called with KEY VALUE."
                                 (complete-with-action action items string pred)))
                             nil t nil nil default-display)))
     (when selected-display
-      (let ((selected-keyword (alist-get selected-display items nil nil #'equal)))
+      (let ((selected-keyword (pimacs--alist-get-equal selected-display items)))
         (cons (pimacs--keyword-name selected-keyword)
               (cdr (assoc selected-keyword options)))))))
 
@@ -168,49 +195,46 @@ PRED is called with KEY VALUE."
          (point)
          (line-end-position))))))
 
-(defun pimacs--align-markdown-tables ()
-  (save-excursion
-    (goto-char (point-min))
-    (while (re-search-forward "|" nil t)
-      (when (markdown-table-at-point-p)
-        (goto-char (markdown-table-begin))
-        (markdown-table-align)
-        (goto-char (markdown-table-end))))))
 
-(defun pimacs--render-markdown (text)
-  (with-temp-buffer
-    (insert text)
-    (let ((inhibit-message t))
-      (ignore-errors
-        (delay-mode-hooks
-          (gfm-view-mode))
-        (when pimacs-align-markdown-tables
-          (condition-case nil
-              (let ((inhibit-read-only t))
-                (pimacs--align-markdown-tables))
-            (error nil)))
-        (font-lock-ensure))
-      (buffer-string))))
+(defun pimacs--render-markdown-default (operation &optional _state text)
+  (pcase operation
+    (:create nil)
+    (:stream (list (list :append text)))
+    (:final (list (list :append text)))
+    (:destroy nil)))
 
-(defun pimacs--render-content (filename content)
+(defun pimacs--render-thinking-default (operation &optional _state text)
+  (pcase operation
+    (:create nil)
+    (:stream
+     (list (list :append text)))
+    (:final
+     (list (list :append (pimacs--fill-string text))))
+    (:destroy nil)))
+
+(defun pimacs--render-content (filename content &optional mode)
   (with-temp-buffer
-    ;; Use a fake temp filename preserving extension only.
-    (setq-local
-     buffer-file-name
-     (expand-file-name
-      (concat "pimacs-fontify"
-              (when-let ((ext (file-name-extension filename t)))
-                ext))
-      temporary-file-directory))
+    (when filename
+      ;; Use a fake temp filename preserving extension only.
+      (setq-local
+       buffer-file-name
+       (expand-file-name
+        (concat "pimacs-fontify"
+                (when-let ((ext (file-name-extension filename t)))
+                  ext))
+        temporary-file-directory)))
 
     (insert content)
 
-    (let ((inhibit-message t))
+    (let ((inhibit-message t)
+          (message-log-max nil))
       (ignore-errors
         (delay-mode-hooks
           (let ((enable-local-variables nil)
                 (enable-local-eval nil))
-            (set-auto-mode)
+            (if mode
+                (funcall mode)
+              (set-auto-mode))
             (font-lock-ensure)))))
 
     ;; Prevent save prompts
@@ -236,14 +260,15 @@ PRED is called with KEY VALUE."
 (defun pimacs--render-diff (diff)
   (with-temp-buffer
     (insert diff)
-    (delay-mode-hooks
-      (diff-mode)
-      (font-lock-ensure)
-      (goto-char (point-min))
-      (while (not (eobp))
-        (diff-hunk-next)
-        (diff-refine-hunk))
-      (pimacs--diff-overlay-to-text-properties))
+    (ignore-errors
+      (delay-mode-hooks
+        (diff-mode)
+        (font-lock-ensure)
+        (goto-char (point-min))
+        (while (not (eobp))
+          (diff-hunk-next)
+          (diff-refine-hunk))
+        (pimacs--diff-overlay-to-text-properties)))
     (set-buffer-modified-p nil)
     (buffer-string)))
 

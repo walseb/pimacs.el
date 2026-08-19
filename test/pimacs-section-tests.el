@@ -693,6 +693,7 @@
           (b (pimacs-section--new-section 'b pimacs-section--root-section)))
       (pimacs-section--insert-section a (insert "[-] A\n"))
       (pimacs-section--insert-section b (insert "[-] B\n"))
+      (pimacs-section--set-visibility a :autohide)
       (let ((pimacs-section-autohide-count nil))
         (pimacs-section-autohide)
         (should (eq (pimacs-section-visibility a) :autoshow))
@@ -730,3 +731,143 @@
         (should (eq (pimacs-section-visibility a) :show))
         (should (eq (pimacs-section-visibility b) :autohide))
         (should (eq (pimacs-section-visibility c) :autoshow))))))
+
+(ert-deftest pimacs-section-autohide-includes-only-configured-types ()
+  (pimacs-with-root-section
+    (let ((user (pimacs-section--new-section 'user pimacs-section--root-section))
+          (old-call (pimacs-section--new-section 'tool-call pimacs-section--root-section))
+          (assistant (pimacs-section--new-section 'assistant pimacs-section--root-section))
+          (new-call (pimacs-section--new-section 'tool-call pimacs-section--root-section)))
+      (pimacs-section--insert-section user (insert "[-] User\n"))
+      (pimacs-section--insert-section old-call (insert "[-] Old call\n"))
+      (pimacs-section--insert-section assistant (insert "[-] Assistant\n"))
+      (pimacs-section--insert-section new-call (insert "[-] New call\n"))
+      (pimacs-section--set-visibility user :autohide)
+      (pimacs-section--set-visibility assistant :autohide)
+      (let ((pimacs-section-autohide-count 1)
+            (pimacs-section-autohide-filter '(:include tool-call)))
+        (pimacs-section-autohide)
+        (should (eq (pimacs-section-visibility user) :autoshow))
+        (should (eq (pimacs-section-visibility old-call) :autohide))
+        (should (eq (pimacs-section-visibility assistant) :autoshow))
+        (should (eq (pimacs-section-visibility new-call) :autoshow))))))
+
+(ert-deftest pimacs-section-autohide-excludes-configured-types ()
+  (pimacs-with-root-section
+    (let ((user (pimacs-section--new-section 'user pimacs-section--root-section))
+          (old-call (pimacs-section--new-section 'tool-call pimacs-section--root-section))
+          (assistant (pimacs-section--new-section 'assistant pimacs-section--root-section))
+          (new-call (pimacs-section--new-section 'tool-call pimacs-section--root-section))
+          (info (pimacs-section--new-section 'info pimacs-section--root-section)))
+      (pimacs-section--insert-section user (insert "[-] User\n"))
+      (pimacs-section--insert-section old-call (insert "[-] Old call\n"))
+      (pimacs-section--insert-section assistant (insert "[-] Assistant\n"))
+      (pimacs-section--insert-section new-call (insert "[-] New call\n"))
+      (pimacs-section--insert-section info (insert "[-] Info\n"))
+      (let ((pimacs-section-autohide-count 1)
+            (pimacs-section-autohide-filter '(:exclude tool-call)))
+        (pimacs-section-autohide)
+        (should (eq (pimacs-section-visibility user) :autohide))
+        (should (eq (pimacs-section-visibility old-call) :autoshow))
+        (should (eq (pimacs-section-visibility assistant) :autohide))
+        (should (eq (pimacs-section-visibility new-call) :autoshow))
+        (should (eq (pimacs-section-visibility info) :autoshow))))))
+
+(ert-deftest pimacs-section-autohide-accepts-predicate-function ()
+  (pimacs-with-root-section
+    (let ((edit (pimacs-section--new-section 'tool-call pimacs-section--root-section))
+          (bash (pimacs-section--new-section 'tool-call pimacs-section--root-section)))
+      (pimacs-section--insert-section edit (insert "[-] Edit\n"))
+      (pimacs-section--insert-section bash (insert "[-] Bash\n"))
+      (pimacs-section--set-info
+       edit (make-pimacs-section-tool-call-info :tool-name "edit"))
+      (pimacs-section--set-info
+       bash (make-pimacs-section-tool-call-info :tool-name "bash"))
+      (pimacs-section--set-visibility edit :autohide)
+      (let ((pimacs-section-autohide-count 0)
+            (pimacs-section-autohide-filter
+             (lambda (section)
+               (not (equal
+                     (pimacs-section-tool-call-info-tool-name
+                      (pimacs-section-info section))
+                     "edit")))))
+        (pimacs-section-autohide)
+        (should (eq (pimacs-section-visibility edit) :autoshow))
+        (should (eq (pimacs-section-visibility bash) :autohide))))))
+
+(ert-deftest pimacs-section-autohide-skips-unchanged-visibility ()
+  (pimacs-with-root-section
+    (let ((a (pimacs-section--new-section 'a pimacs-section--root-section))
+          (b (pimacs-section--new-section 'b pimacs-section--root-section))
+          (pimacs-section-autohide-count 1))
+      (pimacs-section--insert-section a (insert "[-] A\n"))
+      (pimacs-section--insert-section b (insert "[-] B\n"))
+      (pimacs-section-autohide)
+      (let ((setter (symbol-function 'pimacs-section--set-visibility))
+            calls)
+        (cl-letf (((symbol-function 'pimacs-section--set-visibility)
+                   (lambda (&rest args)
+                     (push args calls)
+                     (apply setter args))))
+          (pimacs-section-autohide))
+        (should-not calls)))))
+
+(ert-deftest pimacs-section-cycle-global ()
+  (pimacs-section-tests-with-demo-buffer
+    (let ((build (pimacs-section--find-section '(build) pimacs-section--root-section))
+          (compile (pimacs-section--find-section '(build compile) pimacs-section--root-section))
+          (unit-tests (pimacs-section--find-section '(build test unit-tests)
+                                                    pimacs-section--root-section)))
+      ;; Hide every section.
+      (pimacs-section--cycle-global)
+      (should (eq (pimacs-section-visibility build) :hide))
+      (should (eq (pimacs-section-visibility compile) :hide))
+      (should (eq (pimacs-section-visibility unit-tests) :hide))
+      ;; Show the first level.
+      (pimacs-section--cycle-global)
+      (should (eq (pimacs-section-visibility build) :show))
+      (should (eq (pimacs-section-visibility compile) :hide))
+      ;; Show the second level.
+      (pimacs-section--cycle-global)
+      (should (eq (pimacs-section-visibility compile) :show))
+      (should (eq (pimacs-section-visibility unit-tests) :hide))
+      ;; Show every section, then cycle back to hiding everything.
+      (pimacs-section--cycle-global)
+      (should (eq (pimacs-section-visibility unit-tests) :show))
+      (pimacs-section--cycle-global)
+      (should (eq (pimacs-section-visibility build) :hide)))))
+
+(ert-deftest pimacs-section-show-levels-current-tree ()
+  (pimacs-section-tests-with-demo-buffer
+    (let ((build (pimacs-section--find-section '(build) pimacs-section--root-section))
+          (compile (pimacs-section--find-section '(build compile) pimacs-section--root-section))
+          (logs (pimacs-section--find-section '(logs) pimacs-section--root-section)))
+      (goto-char (pimacs-section-beginning build))
+      (pimacs-section-show-level-1)
+      (should (pimacs-section--hidden-p build))
+      (should (pimacs-section--visible-p logs))
+      (pimacs-section--set-visibility build :show)
+      (goto-char (pimacs-section-beginning build))
+      (pimacs-section-show-level-2)
+      (should (pimacs-section--visible-p build))
+      (should (pimacs-section--hidden-p compile))
+      (should (pimacs-section--visible-p logs)))))
+
+(ert-deftest pimacs-section-inserts-before-existing-child ()
+  (pimacs-with-root-section
+    (let ((pimacs-section-padding "|"))
+      (let* ((loading (pimacs-section--create-section 'history pimacs-section--root-section
+                        (insert "loading")))
+             (boundary (pimacs-section--create-section 'user pimacs-section--root-section
+                         (insert "boundary")))
+             (last (pimacs-section--create-section 'user pimacs-section--root-section
+                     (insert "last")))
+             first second)
+        (pimacs-section--with-insertion-before pimacs-section--root-section boundary
+          (setq first (pimacs-section--create-section 'user pimacs-section--root-section
+                        (insert "first")))
+          (setq second (pimacs-section--create-section 'user pimacs-section--root-section
+                         (insert "second"))))
+        (should (equal (pimacs-section-children pimacs-section--root-section)
+                       (list loading first second boundary last)))
+        (should (equal (buffer-string) "loading|first|second|boundary|last|"))))))

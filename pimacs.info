@@ -20,8 +20,8 @@ END-INFO-DIR-ENTRY
 
 File: pimacs.info,  Node: Top,  Next: Introduction,  Up: (dir)
 
-Pimacs User Manual v0.2.0
-*************************
+Pimacs User Manual v0.5.0-pre
+*****************************
 
 Pimacs is an Emacs client for Pi Coding Agent (https://pi.dev/).  For
 release history, see the changelog (changelog.html).
@@ -30,11 +30,14 @@ release history, see the changelog (changelog.html).
 
 * Introduction::
 * Setup::
+* Doctor::
 * Usage::
+* UI Customization::
 * Sandbox::
 * How It Works::
 * Keybindings::
 * Custom Variables::
+* Custom Faces::
 
 
 File: pimacs.info,  Node: Introduction,  Next: Setup,  Prev: Top,  Up: Top
@@ -47,7 +50,7 @@ provides an interactive interface to the Pi Coding Agent directly from
 Emacs.
 
 
-File: pimacs.info,  Node: Setup,  Next: Usage,  Prev: Introduction,  Up: Top
+File: pimacs.info,  Node: Setup,  Next: Doctor,  Prev: Introduction,  Up: Top
 
 2 Setup
 *******
@@ -66,18 +69,31 @@ Pi.
 2.2 Install ‘pimacs.el’
 =======================
 
-Add the following to your Emacs configuration:
+Pimacs is available from MELPA Stable (https://stable.melpa.org/), which
+is recommended for installation.  Add it to your package archives, then
+install with ‘use-package’:
+
+     (add-to-list 'package-archives
+                  '("melpa-stable" . "https://stable.melpa.org/packages/") t)
 
      (use-package pimacs
-       :ensure t
-       :vc (:url "git@github.com:ananthakumaran/pimacs.el.git"
-            :rev :newest)
-       :commands (pimacs-chat))
+       :ensure t)
 
 
-File: pimacs.info,  Node: Usage,  Next: Sandbox,  Prev: Setup,  Up: Top
+File: pimacs.info,  Node: Doctor,  Next: Usage,  Prev: Setup,  Up: Top
 
-3 Usage
+3 Doctor
+********
+
+Run ‘M-x pimacs-doctor’ to display a dependency report.  It checks that
+Pi is available and meets the minimum supported version, and that
+Tree-sitter and the Markdown grammars are installed.  When Pi or either
+grammar is missing, the report provides a button to install it.
+
+
+File: pimacs.info,  Node: Usage,  Next: UI Customization,  Prev: Doctor,  Up: Top
+
+4 Usage
 *******
 
 Run ‘M-x pimacs-chat’ from any file in your project to start a Pimacs
@@ -100,11 +116,12 @@ anywhere in the chat buffer to move point to the prompt input area.
 * Images::
 * State Lines::
 * Managing Sessions::
+* Section Visibility::
 
 
 File: pimacs.info,  Node: Slash Commands,  Next: File Name Completion,  Up: Usage
 
-3.1 Slash Commands
+4.1 Slash Commands
 ==================
 
 Slash commands (https://pi.dev/docs/latest/usage#slash-commands) support
@@ -149,7 +166,7 @@ Command            Arguments   Description
 
 File: pimacs.info,  Node: File Name Completion,  Next: Bash,  Prev: Slash Commands,  Up: Usage
 
-3.2 File Name Completion
+4.2 File Name Completion
 ========================
 
 Type ‘@’ followed by a partial file path to trigger file name completion
@@ -159,7 +176,7 @@ in the prompt buffer.  The completion backend is controlled by
 
 File: pimacs.info,  Node: Bash,  Next: Sending Context,  Prev: File Name Completion,  Up: Usage
 
-3.3 Bash
+4.3 Bash
 ========
 
 Prefix a command with ‘!’ to run it in Bash.  Use ‘!!’ to run a command
@@ -170,7 +187,7 @@ without adding it to the conversation context.
 
 File: pimacs.info,  Node: Sending Context,  Next: Images,  Prev: Bash,  Up: Usage
 
-3.4 Sending Context
+4.4 Sending Context
 ===================
 
 You can send contextual information from any buffer to the Pimacs chat
@@ -190,7 +207,7 @@ Command                   Description
 
 File: pimacs.info,  Node: Images,  Next: State Lines,  Prev: Sending Context,  Up: Usage
 
-3.5 Images
+4.5 Images
 ==========
 
 You can attach images to your prompt to provide visual context to the
@@ -199,7 +216,7 @@ input area and are sent along with your message.  The agent may also
 render images inline in its responses, for example when using the ‘read’
 tool on a file that contains images.
 
-3.5.1 Supported Formats
+4.5.1 Supported Formats
 -----------------------
 
 The following image formats are supported:
@@ -217,7 +234,7 @@ the mouse, or place point on it and press ‘backspace’ or ‘delete’.
 
 File: pimacs.info,  Node: State Lines,  Next: Managing Sessions,  Prev: Images,  Up: Usage
 
-3.6 State Lines
+4.6 State Lines
 ===============
 
 The header line displays session context and model information.  The
@@ -249,9 +266,9 @@ status only in a state line, add its key to
      (setq pimacs-status-widget-hidden-keys '("xyz-status"))
 
 
-File: pimacs.info,  Node: Managing Sessions,  Prev: State Lines,  Up: Usage
+File: pimacs.info,  Node: Managing Sessions,  Next: Section Visibility,  Prev: State Lines,  Up: Usage
 
-3.7 Managing Sessions
+4.7 Managing Sessions
 =====================
 
 Use ‘pimacs-switch-session’ to switch between active Pimacs chat
@@ -264,9 +281,139 @@ column header to sort by that column.
 ‘pimacs-list-sessions-table’ and ‘pimacs-list-sessions-sort-key’.
 
 
-File: pimacs.info,  Node: Sandbox,  Next: How It Works,  Prev: Usage,  Up: Top
+File: pimacs.info,  Node: Section Visibility,  Prev: Managing Sessions,  Up: Usage
 
-4 Sandbox
+4.8 Section Visibility
+======================
+
+Pimacs represents the chat as a hierarchy of sections.  Every non-root
+section has a type, a visibility state, and may have a parent or
+children.  Put point in a section and run ‘M-x pimacs-describe-section’
+to open a Help buffer with these details.  The report shows the
+section's ‘type’, visibility and user override state, automatic-hiding
+eligibility, applied face, buffer positions, and metadata.  Parent and
+child section types are links; use ‘RET’ to follow them.  The ‘type’
+value is the symbol to use when configuring section faces or automatic
+hiding, such as ‘tool-call’.
+
+   Use ‘TAB’ or ‘C-i’ to toggle the section at point.  Hiding a section
+keeps its first line visible, so it can be shown again.  On graphical
+displays, the fringe indicator can also be selected with the mouse to
+toggle visibility.  Use ‘S-TAB’ to cycle the visibility of the entire
+chat, or ‘1’, ‘2’, and ‘3’ to show progressively more of the tree around
+point.  ‘M-1’, ‘M-2’, and ‘M-3’ do the same for every top-level section.
+See *note Keybindings:: for the complete list of visibility and
+navigation commands.
+
+   As a conversation grows, Pimacs automatically hides older top-level
+sections.  ‘pimacs-section-autohide-count’ sets how many eligible recent
+sections remain visible; its default is 2, and ‘nil’ disables automatic
+hiding.  Use ‘pimacs-section-autohide-filter’ to select the eligible
+section types.  For example, the following keeps four eligible sections
+visible while never automatically hiding user sections:
+
+     (setq pimacs-section-autohide-count 4
+           pimacs-section-autohide-filter '(:exclude user))
+
+   Automatic hiding does not override a section whose visibility you
+explicitly toggled with ‘TAB’ or ‘C-i’.  Set
+‘pimacs-section-visibility-indicators’ to ‘nil’ to disable the fringe
+indicators.
+
+
+File: pimacs.info,  Node: UI Customization,  Next: Sandbox,  Prev: Usage,  Up: Top
+
+5 UI Customization
+******************
+
+Pimacs renders the chat as a sequence of sections.  Each section type
+has a face, so the chat can be styled without changing the Markdown
+renderer.  Customize ‘pimacs-section-type-faces’ to select the face for
+a section type, and customize the selected face with ‘M-x
+customize-face’.
+
+   The built-in section faces are listed in *note Custom Faces::.
+
+5.1 Common Styling Effects
+==========================
+
+A section face supplies the base appearance for one kind of chat
+content.  Only the attributes that you set take effect; leave an
+attribute unspecified when the Markdown or role styling should continue
+to provide it.
+
+   For a coloured assistant card that preserves Markdown colours, set
+only a background and ‘:extend t’:
+
+     (set-face-attribute 'pimacs-section-assistant-face nil
+                         :background "#18212b"
+                         :extend t)
+
+   Set ‘:foreground’ when every part of a section should use one colour.
+Otherwise, leave it as ‘unspecified’ to retain Markdown heading, link,
+and syntax colours.  Likewise, set ‘:height’ or ‘:slant’ to make a
+section compact or italic, and leave ‘:weight’ unspecified when Markdown
+bold text should remain bold.
+
+   Role labels such as ‘assistant>’ and tool names retain their own
+recognizable colours by default.  Configure their faces separately when
+you want to change them.
+
+5.2 Cards and Padding
+=====================
+
+Section faces are also applied to ‘pimacs-section-padding’.  Specify
+both ‘:background’ and ‘:extend t’ for a full-width card background; the
+background then also covers empty padding lines.
+
+   Thinking defaults to ‘shadow’.  A compact, more subdued thinking card
+can be configured as follows:
+
+     (set-face-attribute 'pimacs-section-thinking-face nil
+                         :foreground "#64707c"
+                         :background "#131a21"
+                         :height 0.9
+                         :extend t)
+
+5.3 Choosing Section Faces
+==========================
+
+The type-to-face mapping is evaluated when a section is created.  Change
+one entry without replacing the other defaults with ‘alist-get’:
+
+     (setf (alist-get 'tool-result pimacs-section-type-faces)
+           'my-pimacs-tool-result-face)
+
+   Define a named face when several attributes belong together:
+
+     (defface my-pimacs-tool-result-face
+       '((t :inherit fixed-pitch
+            :foreground "#c2cbd5"
+            :background "#1a2027"
+            :extend t))
+       "My Pimacs tool result face.")
+
+   Changing a face updates already-displayed text immediately.  Changing
+‘pimacs-section-type-faces’ affects newly created sections; recreate the
+chat contents to apply a new mapping to existing sections.
+
+5.4 Prompt Face
+===============
+
+The editable portion of the prompt uses ‘pimacs-prompt-face’ and can be
+customized independently:
+
+     (set-face-attribute 'pimacs-prompt-face nil
+                         :foreground "#d7e0e8"
+                         :background "#202936"
+                         :extend t)
+
+   The ‘user>’ prompt label uses ‘pimacs-chat-user-role-face’.
+
+
+File: pimacs.info,  Node: Sandbox,  Next: How It Works,  Prev: UI Customization,  Up: Top
+
+6 Sandbox
 *********
 
 To run Pi inside a sandbox, customize ‘pimacs-executable’ and
@@ -279,7 +426,7 @@ To run Pi inside a sandbox, customize ‘pimacs-executable’ and
 
 File: pimacs.info,  Node: How It Works,  Next: Keybindings,  Prev: Sandbox,  Up: Top
 
-5 How It Works
+7 How It Works
 **************
 
 Emacs starts Pi in RPC mode (https://pi.dev/docs/latest/rpc).  In this
@@ -288,13 +435,29 @@ interface.  Some features, such as ‘/login’ and ‘/logout’, are not
 supported (https://github.com/earendil-works/pi/issues/885) because they
 are not currently exposed through the RPC API.
 
+7.1 Extension UI
+================
+
+Pimacs supports the RPC-compatible extension UI methods: notifications,
+selection, confirmation, text input, editing text in an Emacs buffer,
+setting the prompt text and chat title, prompt widgets, and status text.
+Extension commands, tools, hooks, and custom messages are also
+supported.
+
+   Pimacs does not support terminal-specific extension UI features,
+including ‘ctx.ui.custom()’ components, component factories, extension
+keyboard shortcuts, or custom TUI rendering callbacks.  Extensions
+should use the supported UI methods when running in RPC mode.  See the
+Pi extension documentation (https://pi.dev/docs/latest/extensions) for
+the full extension API.
+
 
 File: pimacs.info,  Node: Keybindings,  Next: Custom Variables,  Prev: How It Works,  Up: Top
 
-6 Keybindings
+8 Keybindings
 *************
 
-6.1 Chat Buffer Keybindings
+8.1 Chat Buffer Keybindings
 ===========================
 
 Key            Command                Description
@@ -305,6 +468,21 @@ Key            Command                Description
 ‘C-g’          ‘pimacs-abort’         Abort the current operation
 ‘TAB’, ‘C-i’   ‘pimacs-toggle-section’Toggle visibility of the section
                                       at point
+‘S-TAB’        ‘pimacs-section-cycle-global’Cycle global section visibility,
+                                      hiding all sections and then
+                                      expanding one more level at a time
+‘1’            ‘pimacs-section-show-level-1’Show the current section tree at
+                                      the first level
+‘2’            ‘pimacs-section-show-level-2’Show the current section tree
+                                      through the second level
+‘3’            ‘pimacs-section-show-level-3’Show the current section tree
+                                      through the third level
+‘M-1’          ‘pimacs-section-show-level-1-all’Show only headings of all root
+                                      sections
+‘M-2’          ‘pimacs-section-show-level-2-all’Show root sections and only
+                                      headings of their children
+‘M-3’          ‘pimacs-section-show-level-3-all’Show sections through the second
+                                      level and headings at the third
 ‘n’, ‘M-n’     ‘pimacs-goto-next-section’Move to the next section
 ‘N’            ‘pimacs-goto-next-user-message’Move to the next user message
 ‘p’, ‘M-p’     ‘pimacs-goto-previous-section’Move to the previous section
@@ -313,7 +491,7 @@ Key            Command                Description
 ‘i’            ‘pimacs-focus-prompt’  Focus the prompt input field
 ‘q’            ‘pimacs-quit-chat’     Quit the chat buffer
 
-6.2 Prompt Input Keybindings
+8.2 Prompt Input Keybindings
 ============================
 
 Key            Command                Description
@@ -328,11 +506,12 @@ Key            Command                Description
 ‘M-RET’        ‘pimacs-send-prompt-alternate’Send the prompt using the
                                       alternate streaming behavior
 ‘M-g l’        ‘pimacs-goto-last-section’Jump to the most recent section
+‘S-TAB’        ‘pimacs-section-cycle-global’Cycle global section visibility
 
 
-File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
+File: pimacs.info,  Node: Custom Variables,  Next: Custom Faces,  Prev: Keybindings,  Up: Top
 
-7 Custom Variables
+9 Custom Variables
 ******************
 
  -- User Option: pimacs-status-widget-hidden-keys nil
@@ -341,7 +520,8 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      Hidden statuses remain available to ‘(:status STATUS-KEY ...)’
      components in ‘pimacs-header-line-format’ and
-     ‘pimacs-mode-line-format’.
+     ‘pimacs-mode-line-format’.  Hover over a status in the default
+     widget to see its key.
 
  -- User Option: pimacs-file-completion-backend 'project
 
@@ -368,6 +548,31 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      ‘followUp’: Wait until the agent finishes.  Message is delivered
      only when agent stops.
+
+ -- User Option: pimacs-markdown-renderer #'pimacs--render-markdown
+
+     Function used to render Markdown content.
+
+     Pi calls it as ‘(RENDERER :create)’, ‘(RENDERER :stream STATE
+     TEXT)’, ‘(RENDERER :final STATE TEXT)’, and ‘(RENDERER :destroy
+     STATE)’.  ‘:create’ returns opaque renderer state.  ‘:stream’ and
+     ‘:final’ return ‘:append’, ‘:delete’, and ‘:replace-suffix’
+     operations.  ‘:destroy’ releases resources.
+
+     The default uses the incremental Tree-sitter Markdown renderer.  It
+     requires the Markdown and Markdown Inline Tree-sitter grammars.
+
+ -- User Option: pimacs-thinking-renderer
+          #'pimacs--render-thinking-default
+
+     Function used to render assistant thinking content.
+
+     It implements the same ‘:create’, ‘:stream’, ‘:final’, and
+     ‘:destroy’ renderer protocol as ‘pimacs-markdown-renderer’.
+
+     The default preserves the legacy, dimmed plain-text rendering.  Set
+     this to ‘pimacs--render-thinking-markdown’ to render thinking as
+     Markdown.
 
  -- User Option: pimacs-slash-commands
 
@@ -612,9 +817,29 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
 
      See ‘pimacs-header-line-format’ for available components.
 
- -- User Option: pimacs-align-markdown-tables t
+ -- User Option: pimacs-markdown-leading-newline-block-types
 
-     Whether to align markdown tables while rendering assistant output.
+          '("pipe_table"
+            "fenced_code_block"
+            "indented_code_block"
+            "block_quote"
+            "list"
+            "thematic_break"
+            "html_block")
+
+     List of Markdown block node types.  Render these on a fresh line
+     when the renderer starts mid-line.
+
+ -- User Option: pimacs-markdown-incremental-render-debug nil
+
+     Whether to capture incremental Markdown rendering diagnostics.
+
+     When non-nil, diagnostics are appended to the temporary buffer
+     ‘*pimacs-markdown-incremental-debug*’.
+
+ -- User Option: pimacs-markdown-use-unicode-tables t
+
+     Whether to render Markdown tables with Unicode borders.
 
  -- User Option: pimacs-section-autohide-count 2
 
@@ -622,6 +847,20 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
      helps reduce clutter by collapsing earlier responses when the
      conversation grows long.  When nil, auto hiding is disabled and no
      sections are hidden automatically.
+
+ -- User Option: pimacs-section-autohide-filter 'all
+
+     Filter controlling which sections are eligible for automatic
+     hiding.
+
+     When set to ‘all’, every top-level section is eligible.
+
+     A value of ‘(:include TYPE...)’ makes only the listed section types
+     eligible.  A value of ‘(:exclude TYPE...)’ makes every section type
+     except the listed types eligible.  A function value is called with
+     each top-level section and should return non-nil when that section
+     is eligible.  Non-eligible sections do not count toward
+     ‘pimacs-section-autohide-count’.
 
  -- User Option: pimacs-section-padding "\n\n"
 
@@ -637,23 +876,253 @@ File: pimacs.info,  Node: Custom Variables,  Prev: Keybindings,  Up: Top
      The car is used for hidden sections and the cdr for visible
      sections.  Set this to nil to disable fringe indicators.
 
+ -- User Option: pimacs-section-type-faces
+
+          '((root . pimacs-section-root-face)
+            (thinking . pimacs-section-thinking-face)
+            (thinking-level . pimacs-section-thinking-level-face)
+            (assistant . pimacs-section-assistant-face)
+            (user . pimacs-section-user-face)
+            (tool-call . pimacs-section-tool-call-face)
+            (tool-result . pimacs-section-tool-result-face)
+            (error . pimacs-section-error-face)
+            (model . pimacs-section-model-face)
+            (compact . pimacs-section-compact-face)
+            (info . pimacs-section-info-face)
+            (custom . pimacs-section-custom-face)
+            (queue . pimacs-section-queue-face)
+            (notify . pimacs-section-notify-face)
+            (select . pimacs-section-select-face)
+            (confirm . pimacs-section-confirm-face)
+            (input . pimacs-section-input-face)
+            (session . pimacs-section-session-face))
+
+     Faces prepended to content in sections of each type.
+
+
+File: pimacs.info,  Node: Custom Faces,  Prev: Custom Variables,  Up: Top
+
+10 Custom Faces
+***************
+
+ -- Face: pimacs-chat-role-face '((t :inherit font-lock-builtin-face))
+
+     Face used for generic chat role labels.
+
+ -- Face: pimacs-chat-user-role-face '((t :inherit
+          font-lock-keyword-face))
+
+     Face used for user chat message role labels.
+
+ -- Face: pimacs-chat-assistant-role-face '((t :inherit
+          font-lock-constant-face))
+
+     Face used for assistant chat message role labels.
+
+ -- Face: pimacs-chat-title-face '((t :inherit font-lock-builtin-face))
+
+     Face used for titles.
+
+ -- Face: pimacs-prompt-face '((t :inherit widget-field))
+
+     Face used for the Pimacs prompt input field.
+
+ -- Face: pimacs-error-face '((t :inherit error))
+
+     Face used for Pimacs widget error messages.
+
+ -- Face: pimacs-tool-name-face '((t :inherit
+          font-lock-function-name-face))
+
+     Face used for tool names in tool execution events.
+
+ -- Face: pimacs-grep-match-face '((t :inherit match))
+
+     Face used to highlight matching text in grep tool results.
+
+ -- Face: pimacs-notify-info-face '((t :inherit font-lock-comment-face))
+
+     Face used for info notification messages.
+
+ -- Face: pimacs-notify-warning-face '((t :inherit warning))
+
+     Face used for warning notification messages.
+
+ -- Face: pimacs-notify-error-face '((t :inherit error))
+
+     Face used for error notification messages.
+
+ -- Face: pimacs-widget-face '((t :inherit shadow))
+
+     Face used for extension widgets.
+
+ -- Face: pimacs-status-face '((t :inherit shadow))
+
+     Face used for extension status.
+
+ -- Face: pimacs-markdown-heading-face '((t :inherit
+          font-lock-function-name-face :weight bold))
+
+     Face used for Markdown headings.
+
+ -- Face: pimacs-markdown-inline-code-face '((t :inherit (fixed-pitch
+          font-lock-constant-face)))
+
+     Face used for inline code.
+
+ -- Face: pimacs-markdown-equation-face '((t :inherit (fixed-pitch
+          font-lock-constant-face)))
+
+     Face used for Markdown equations.
+
+ -- Face: pimacs-markdown-bold-face '((t :inherit bold))
+
+     Face used for bold text.
+
+ -- Face: pimacs-markdown-italic-face '((t :inherit italic))
+
+     Face used for italic text.
+
+ -- Face: pimacs-markdown-strike-through-face '((t :strike-through t))
+
+     Face used for Markdown strike-through text.
+
+ -- Face: pimacs-markdown-superscript-face '((t :height 0.8 :raise 0.3))
+
+     Face used for Markdown superscript text.
+
+ -- Face: pimacs-markdown-subscript-face '((t :height 0.8 :raise -0.2))
+
+     Face used for Markdown subscript text.
+
+ -- Face: pimacs-markdown-link-face '((t :inherit link))
+
+     Face used for provisional Markdown links.
+
+ -- Face: pimacs-markdown-list-marker-face '((t :inherit shadow :slant
+          normal :weight normal))
+
+     Face used for Markdown list markers.
+
+ -- Face: pimacs-markdown-checkbox-face '((t :inherit
+          font-lock-builtin-face))
+
+     Face used for Markdown task-list checkboxes.
+
+ -- Face: pimacs-markdown-blockquote-face '((t :inherit
+          font-lock-comment-face))
+
+     Face used for Markdown blockquotes.
+
+ -- Face: pimacs-markdown-horizontal-rule-face '((t :inherit shadow))
+
+     Face used for Markdown horizontal rules.
+
+ -- Face: pimacs-markdown-code-block-face '((t :inherit fixed-pitch))
+
+     Face used as the base face of Markdown code blocks.
+
+ -- Face: pimacs-markdown-table-header-face '((t :inherit fixed-pitch))
+
+     Face used for Markdown table headers.
+
+ -- Face: pimacs-markdown-table-border-face '((t :inherit fixed-pitch))
+
+     Face used for Markdown table borders.
+
+ -- Face: pimacs-section-root-face '((t))
+
+     Face applied to root sections.
+
+ -- Face: pimacs-section-thinking-face '((t :inherit shadow))
+
+     Face applied to thinking sections.
+
+ -- Face: pimacs-section-thinking-level-face '((t :inherit shadow))
+
+     Face applied to thinking-level sections.
+
+ -- Face: pimacs-section-assistant-face '((t))
+
+     Face applied to assistant sections.
+
+ -- Face: pimacs-section-user-face '((t :inherit highlight :extend t))
+
+     Face applied to user sections.
+
+ -- Face: pimacs-section-tool-call-face '((t))
+
+     Face applied to tool call sections.
+
+ -- Face: pimacs-section-tool-result-face '((t))
+
+     Face applied to tool result sections.
+
+ -- Face: pimacs-section-error-face '((t :inherit pimacs-error-face))
+
+     Face applied to error sections.
+
+ -- Face: pimacs-section-model-face '((t :inherit shadow))
+
+     Face applied to model sections.
+
+ -- Face: pimacs-section-compact-face '((t :inherit shadow))
+
+     Face applied to compaction sections.
+
+ -- Face: pimacs-section-info-face '((t :inherit shadow))
+
+     Face applied to information sections.
+
+ -- Face: pimacs-section-custom-face '((t))
+
+     Face applied to custom sections.
+
+ -- Face: pimacs-section-queue-face '((t :inherit shadow))
+
+     Face applied to queue sections.
+
+ -- Face: pimacs-section-notify-face '((t))
+
+     Face applied to notification sections.
+
+ -- Face: pimacs-section-select-face '((t :inherit shadow))
+
+     Face applied to selection sections.
+
+ -- Face: pimacs-section-confirm-face '((t :inherit shadow))
+
+     Face applied to confirmation sections.
+
+ -- Face: pimacs-section-input-face '((t :inherit shadow))
+
+     Face applied to input sections.
+
+ -- Face: pimacs-section-session-face '((t :inherit shadow))
+
+     Face applied to session sections.
+
 
 Tag Table:
 Node: Top746
-Node: Introduction1102
-Node: Setup1359
-Node: Usage2030
-Node: Slash Commands2880
-Node: File Name Completion5121
-Node: Bash5449
-Node: Sending Context5716
-Node: Images6524
-Node: State Lines7389
-Node: Managing Sessions8717
-Node: Sandbox9310
-Node: How It Works9692
-Node: Keybindings10142
-Node: Custom Variables12300
+Node: Introduction1159
+Node: Setup1416
+Node: Doctor2213
+Node: Usage2585
+Node: Slash Commands3468
+Node: File Name Completion5709
+Node: Bash6037
+Node: Sending Context6304
+Node: Images7112
+Node: State Lines7977
+Node: Managing Sessions9305
+Node: Section Visibility9925
+Node: UI Customization11955
+Node: Sandbox15226
+Node: How It Works15619
+Node: Keybindings16771
+Node: Custom Variables20108
+Node: Custom Faces34826
 
 End Tag Table
 

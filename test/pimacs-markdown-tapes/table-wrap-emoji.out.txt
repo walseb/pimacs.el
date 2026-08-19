@@ -1,0 +1,33 @@
+│ │ 🚀 Feature  │ Description  │ Status ✅  │
+@ ^ table-border
+@              ^ table-border
+@                             ^ table-border
+@                                         ^ table-border
+@   ^^^^^^^^^^ table-header
+@                ^^^^^^^^^^^^ table-header
+@                               ^^^^^^^^^ table-header
+│ ├────────────────── ┼─────────────────────────────────────── ┼─────────── ┤
+@ ^^^^^^^^^^^^^^^^^^^ table-border
+@                     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ table-border
+@                                                              ^^^^^^^^^^^^ table-border
+@                                                                           ^ table-border
+│ │ 🚀 A very long  │ This description should wrap because  │ ✅  │
+@ ^ table-border
+@                  ^ table-border
+@                                                          ^ table-border
+@                                                               ^ table-border
+│ │ feature name  │ it does not fit in the table width.  │   │
+@ ^ table-border
+@                 ^ table-border
+@                                                        ^ table-border
+@                                                            ^ table-border
+│ │ Corners 📌  │ Emoji stays aligned near the right  │ ⚠️  │
+@ ^ table-border
+@              ^ table-border
+@                                                    ^ table-border
+@                                                          ^ table-border
+│ │   │ corner 🎯  │   │
+@ ^ table-border
+@     ^ table-border
+@                 ^ table-border
+@                     ^ table-border
