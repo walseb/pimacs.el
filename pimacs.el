@@ -2225,6 +2225,16 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                                   :message first-text
                                   :name name))))
 
+(defun pimacs--session-files-by-last-message (session-dir)
+  "Return SESSION-DIR's session files, newest last message first."
+  ;; Session logs are append-only, so their modification time tracks the last
+  ;; message without requiring every potentially large JSONL file to be read.
+  (sort (directory-files session-dir t "\\.jsonl$")
+        (lambda (a b)
+          (time-less-p
+           (file-attribute-modification-time (file-attributes b))
+           (file-attribute-modification-time (file-attributes a))))))
+
 (defun pimacs-resume ()
   "Resume a previous session."
   (interactive)
@@ -2238,8 +2248,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                 (session-dir (file-name-directory session-file))
                 (files (when session-dir
                          (seq-take
-                          (sort (directory-files session-dir t "\\.jsonl$")
-                                #'string>)
+                          (pimacs--session-files-by-last-message session-dir)
                           pimacs-resume-max-sessions)))
                 (sessions (mapcar #'pimacs--read-session-choice files)))
            (if (null sessions)
