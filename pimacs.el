@@ -2181,16 +2181,17 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 
 (defun pimacs--read-session-choice (filename)
   (with-temp-buffer
-    (insert-file-contents filename nil 0 10000)
+    ;; A rename is recorded as a later session_info entry, so read the whole
+    ;; log rather than only its initial entries.  The last name is authoritative.
+    (insert-file-contents filename)
     (goto-char (point-min))
     (let ((id nil)
           (timestamp nil)
           (cwd nil)
           (parent-id nil)
           (first-text nil)
-          (name nil)
-          (lines-read 0))
-      (while (and (< lines-read 20) (not (eobp)))
+          (name nil))
+      (while (not (eobp))
         (let ((line (buffer-substring-no-properties
                      (line-beginning-position) (line-end-position))))
           (unless (string-empty-p line)
@@ -2212,8 +2213,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                      (unless first-text
                        (setq first-text (pimacs--content-header (plist-get (plist-get json :message) :content)))))))
               (error nil))))
-        (forward-line 1)
-        (cl-incf lines-read))
+        (forward-line 1))
       (make-pimacs-session-choice :id id
                                   :path filename
                                   :timestamp (when timestamp
@@ -2253,11 +2253,10 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                                                  ""))
                                (short-id (pimacs--short-uuid (pimacs-session-choice-id s)))
                                (short-parent (pimacs--short-uuid (pimacs-session-choice-parent-id s))))
-                          (cons (format "%s  %s  %s%s%s" short-id formatted-time
-                                        (if (pimacs-session-choice-name s)
-                                            (format "[%s] " (pimacs-session-choice-name s))
-                                          "")
-                                        (pimacs-session-choice-message s)
+                          (cons (format "%s  %s  %s%s" short-id formatted-time
+                                        (or (pimacs-session-choice-name s)
+                                            (pimacs-session-choice-message s)
+                                            "")
                                         (if short-parent (format " (parent: %s)" short-parent) ""))
                                 s)))
                       sessions))

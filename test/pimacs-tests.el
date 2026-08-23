@@ -64,6 +64,22 @@
       (dolist (buffer (list first second unnamed unique))
         (kill-buffer buffer)))))
 
+(ert-deftest pimacs--read-session-choice-uses-latest-name-as-summary ()
+  (let ((file (make-temp-file "pimacs-session-" nil ".jsonl")))
+    (unwind-protect
+        (progn
+          (with-temp-file file
+            (insert "{\"type\":\"session\",\"id\":\"session-id\",\"timestamp\":\"2026-01-01T00:00:00Z\",\"cwd\":\"/tmp\"}\n")
+            (insert "{\"type\":\"message\",\"message\":{\"role\":\"user\",\"content\":\"original summary\"}}\n")
+            ;; Put the rename beyond the old 20-entry scan limit.
+            (dotimes (_ 20)
+              (insert "{\"type\":\"model_change\"}\n"))
+            (insert "{\"type\":\"session_info\",\"name\":\"renamed session\"}\n"))
+          (let ((choice (pimacs--read-session-choice file)))
+            (should (equal (pimacs-session-choice-name choice) "renamed session"))
+            (should (equal (pimacs-session-choice-message choice) "original summary"))))
+      (delete-file file))))
+
 (ert-deftest pimacs--parse-slash-command ()
   (should (equal (pimacs--parse-slash-command "/model") '(pimacs-select-model . nil)))
   (should (equal (pimacs--parse-slash-command "/new") '(pimacs-new-session . nil)))
