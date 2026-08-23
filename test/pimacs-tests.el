@@ -80,6 +80,19 @@
             (should (equal (pimacs-session-choice-message choice) "original summary"))))
       (delete-file file))))
 
+(ert-deftest pimacs--session-files-by-last-message-sorts-newest-first ()
+  (let ((dir (make-temp-file "pimacs-sessions-" t)))
+    (unwind-protect
+        (let ((older (expand-file-name "newer-created.jsonl" dir))
+              (newer (expand-file-name "older-created.jsonl" dir)))
+          (write-region "" nil older nil 'silent)
+          (write-region "" nil newer nil 'silent)
+          (set-file-times older (seconds-to-time 100))
+          (set-file-times newer (seconds-to-time 200))
+          (should (equal (pimacs--session-files-by-last-message dir)
+                         (list newer older))))
+      (delete-directory dir t))))
+
 (ert-deftest pimacs--parse-slash-command ()
   (should (equal (pimacs--parse-slash-command "/model") '(pimacs-select-model . nil)))
   (should (equal (pimacs--parse-slash-command "/new") '(pimacs-new-session . nil)))
