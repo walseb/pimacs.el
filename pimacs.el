@@ -2179,19 +2179,54 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
 (cl-defstruct pimacs-session-choice
   id message timestamp cwd path parent-id name)
 
+(defun pimacs--latest-session-name (filename)
+  "Return the name from FILENAME's latest session_info entry."
+  ;; Search backwards so a recent rename does not require loading and parsing
+  ;; the (potentially very large) message history.  Overlap chunks so entries
+  ;; that cross a chunk boundary are included in the preceding chunk.
+  (let ((end (file-attribute-size (file-attributes filename)))
+        (chunk-size (* 64 1024))
+        (overlap (* 4 1024))
+        name
+        found)
+    (while (and (> end 0) (not found))
+      (let ((start (max 0 (- end chunk-size))))
+        (with-temp-buffer
+          (insert-file-contents filename nil start end)
+          ;; At a nonzero offset, the first entry may be incomplete.  It will
+          ;; be complete in the next, overlapping chunk.
+          (when (> start 0)
+            (goto-char (point-min))
+            (if (search-forward "\n" nil t)
+                (delete-region (point-min) (point))
+              (erase-buffer)))
+          (goto-char (point-max))
+          (while (and (not found)
+                      (re-search-backward
+                       "\\\"type\\\"[ \t]*:[ \t]*\\\"session_info\\\"" nil t))
+            (let ((line (buffer-substring-no-properties
+                         (line-beginning-position) (line-end-position))))
+              (condition-case nil
+                  (let ((json (json-parse-string line :object-type 'plist)))
+                    (when (equal (plist-get json :type) "session_info")
+                      (setq name (plist-get json :name)
+                            found t)))
+                (error nil)))))
+        (setq end (if (= start 0) 0 (+ start overlap)))))
+    name))
+
 (defun pimacs--read-session-choice (filename)
   (with-temp-buffer
-    ;; A rename is recorded as a later session_info entry, so read the whole
-    ;; log rather than only its initial entries.  The last name is authoritative.
-    (insert-file-contents filename)
+    ;; Session metadata and the first message are at the start of the log.
+    (insert-file-contents filename nil 0 10000)
     (goto-char (point-min))
     (let ((id nil)
           (timestamp nil)
           (cwd nil)
           (parent-id nil)
           (first-text nil)
-          (name nil))
-      (while (not (eobp))
+          (lines-read 0))
+      (while (and (< lines-read 20) (not (eobp)))
         (let ((line (buffer-substring-no-properties
                      (line-beginning-position) (line-end-position))))
           (unless (string-empty-p line)
@@ -2207,13 +2242,13 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                                         (file-name-nondirectory ps))))
                      (when parent-id
                        (setq parent-id (car (last (split-string parent-id "_"))))))
-                    ('session_info
-                     (setq name (plist-get json :name)))
                     ('message
                      (unless first-text
-                       (setq first-text (pimacs--content-header (plist-get (plist-get json :message) :content)))))))
+                       (setq first-text (pimacs--content-header
+                                         (plist-get (plist-get json :message) :content)))))))
               (error nil))))
-        (forward-line 1))
+        (forward-line 1)
+        (cl-incf lines-read))
       (make-pimacs-session-choice :id id
                                   :path filename
                                   :timestamp (when timestamp
@@ -2223,7 +2258,7 @@ FIELDS is a list of (LABEL . KEY) where KEY is a plist key."
                                   :cwd cwd
                                   :parent-id parent-id
                                   :message first-text
-                                  :name name))))
+                                  :name (pimacs--latest-session-name filename)))))
 
 (defun pimacs--session-files-by-last-message (session-dir)
   "Return SESSION-DIR's session files, newest last message first."
